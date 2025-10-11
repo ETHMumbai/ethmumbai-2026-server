@@ -1,0 +1,23 @@
+# render.yaml - Deployment configuration for ETHMumbai Backend
+
+services:
+  - type: web
+    name: ethmumbai-backend
+    env: node
+    plan: starter          # change plan if needed
+    branch: main
+    region: oregon         # or pick your preferred region
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm run start:prod
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: ethmumbai-db
+      - key: NODE_ENV
+        value: production
+
+databases:
+  - name: ethmumbai-db
+    plan: starter
+    region: oregon
+    postgresVersion: 17
