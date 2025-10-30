@@ -65,7 +65,7 @@ export class DaimoService {
       //   },
       // });
 
-      const verification = await this.verifyDaimoPayment(payId);
+      // const verification = await this.verifyDaimoPayment(payId);
 
       // if (verification.success) {
       //   await this.prisma.order.update({
@@ -77,7 +77,6 @@ export class DaimoService {
       return {
         success: true,
         payment: data,
-        verification,
       };
     } catch (error) {
       console.error(
