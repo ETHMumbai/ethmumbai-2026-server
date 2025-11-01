@@ -1,46 +1,46 @@
-'use client';
-
 import {
   Injectable,
   InternalServerErrorException,
-  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import axios from 'axios';
-import { baseUSDC } from '@daimo/pay-common';
-import { getAddress } from 'viem';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaymentType } from '@prisma/client';
 
 @Injectable()
 export class DaimoService {
   private readonly DAIMO_API_URL = 'https://pay.daimo.com/api/payment';
-  private readonly DAIMO_API_KEY = process.env.DAIMO_API_KEY; // stored in .env
-  private readonly DESTINATION_ADDRESS = process.env.DAIMO_DESTINATION_ADDRESS; // your wallet address
-  // private readonly REFUND_ADDRESS = process.env.DAIMO_REFUND_ADDRESS; // refund wallet
+  private readonly DAIMO_API_KEY = process.env.DAIMO_API_KEY;
+  private readonly DESTINATION_ADDRESS = process.env.DAIMO_DESTINATION_ADDRESS;
 
   constructor(private prisma: PrismaService) {}
 
-  async createOrder(order: any) {
-    // You can generate a Daimo payment payload here
+  /**
+   * Create a Daimo payment order
+   */
+  async createOrder(amount: number, currency = 'USDC') {
+    if (!this.DAIMO_API_KEY || !this.DESTINATION_ADDRESS) {
+      throw new InternalServerErrorException('Missing Daimo configuration');
+    }
+
     try {
-      // ✅ Build the DaimoPay payload
+      // Daimo expects amount in string, and USDC token address on Base (mainnet)
       const payload = {
         display: {
           intent: 'Checkout',
         },
         destination: {
           destinationAddress: this.DESTINATION_ADDRESS,
-          chainId: 8453,
-          tokenAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-          amountUnits: '0.1',
+          chainId: 8453, // Base mainnet
+          tokenAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC
+          amountUnits: amount.toString(), // <-- FIXED: amount passed from argument
         },
-        // refundAddress: this.REFUND_ADDRESS,
         metadata: {
-          mySystemId: 'ETHMumbai',
-          name: 'ETHMumbai',
+          system: 'ETHMumbai',
+          currency: currency,
         },
       };
 
-      // ✅ Send POST request to DaimoPay API
       const response = await axios.post(this.DAIMO_API_URL, payload, {
         headers: {
           'Api-Key': this.DAIMO_API_KEY,
@@ -48,105 +48,62 @@ export class DaimoService {
         },
       });
 
-      // DaimoPay returns a JSON with payment info (e.g. paymentId or URL)
       const data = response.data;
-      const payId = data.payment.id; // or response.data.id
+      const payId = data.payment?.id;
 
-      console.log('✅ DaimoPay Payment Created with payId:', payId);
-
-      // Optionally, store order in DB here
-      // await this.prisma.payment.create({
-      //   data: {
-      //     orderId: order.id,
-      //     vendor: order.paymentType,
-      //     vendorPaymentId: data.id,
-      //     rawPayload: data,
-      //     status: 'created',
-      //   },
-      // });
-
-      // const verification = await this.verifyDaimoPayment(payId);
-
-      // if (verification.success) {
-      //   await this.prisma.order.update({
-      //     where: { id: order.id },
-      //     data: { status: 'paid' },
-      //   });
-      // }
+      console.log('✅ Daimo Payment Created:', payId);
 
       return {
         success: true,
-        payment: data,
+        paymentId: payId,
       };
     } catch (error) {
       console.error(
-        '❌ DaimoPay createOrder error:',
+        '❌ Daimo createOrder error:',
         error.response?.data || error.message,
       );
-      throw new InternalServerErrorException('Payment initialization failed');
+      throw new InternalServerErrorException('Failed to create Daimo order');
     }
   }
 
-  async verify(dto: any) {
-    //   // Call Daimo API / check on-chain transaction
-    //   // const { payment } = await this.createOrder(dto);
+  /**
+   * Verify Daimo Payment by Payment ID
+   */
+  async verifyPayment(paymentId: string) {
+    if (!paymentId) throw new BadRequestException('Missing Daimo paymentId');
 
-    //    // Fetch Payment record
-    //   const payment = await this.prisma.payment.findFirst({
-    //         where: { vendorPaymentId : data.id },
-    //         include: { order: true },
-    //       });
-
-    //   if (!payment) throw new BadRequestException('Payment record not found');
-
-    //   if (payment && payment.status === 'payment_complete') {
-    //     return { success: true };
-    //   }
-    return { success: false };
-  }
-
-  async verifyDaimoPayment(payId: string) {
     try {
-      if (!payId) throw new NotFoundException('Missing payId');
+      const response = await axios.get(`${this.DAIMO_API_URL}/${paymentId}`, {
+        headers: { 'Api-Key': this.DAIMO_API_KEY },
+      });
 
-      // 1️⃣ Call Daimo Payments API
-      const response = await axios.get(
-        `https://pay.daimo.com/api/payment/${payId}`,
-        {
-          headers: {
-            'Api-Key': this.DAIMO_API_KEY,
-          },
-        },
-      );
-
-      const payment = response.data;
+      const payment = response.data?.payment || response.data;
 
       console.log('🧾 Daimo payment fetched:', payment);
 
-      // 2️⃣ Check payment status
-      if (payment.status === 'payment_complete') {
-        // 3️⃣ Update DB (mark as paid)
-        // await this.prisma.payment.update({
-        //   where: { vendorPaymentId: payId },
-        //   data: {
-        //     status: 'paid',
-        //     verified: true,
-        //   },
-        // });
+      const isComplete = payment.status === 'payment_complete';
 
-        return { success: true, message: '✅ Payment verified successfully' };
-      } else {
-        return {
-          success: false,
-          message: `⚠️ Payment not completed. Current status: ${payment.status}`,
-        };
-      }
+      // ✅ Update the order in DB based on paymentId
+      await this.prisma.order.updateMany({
+        where: { daimoPaymentId: paymentId },
+        data: {
+          status: isComplete ? 'paid' : 'pending',
+        },
+      });
+
+      return {
+        success: isComplete,
+        status: payment.status,
+        message: isComplete
+          ? '✅ Payment verified successfully'
+          : `⚠️ Payment not completed. Status: ${payment.status}`,
+      };
     } catch (error) {
       console.error(
         '❌ Error verifying Daimo payment:',
         error.response?.data || error.message,
       );
-      throw new Error('Failed to verify Daimo payment');
+      throw new InternalServerErrorException('Failed to verify Daimo payment');
     }
   }
 }
