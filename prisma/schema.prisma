@@ -15,7 +15,8 @@ model Ticket {
   id       Int      @id @default(autoincrement())
   title    String   @unique
   type     String   // "earlybird" or "standard"
-  price    Float
+  fiat     Float   @default(999)
+  crypto   Float   @default(12)
   quantity Int
   orders   Order[]
 }

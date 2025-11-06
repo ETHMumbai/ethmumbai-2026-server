@@ -15,14 +15,23 @@ export class PaymentsService {
 
   // RAZORPAY ORDER CREATION
   async createRazorpayOrder(data: any) {
-    const { ticketId, buyerName, buyerEmail, buyerPhone, participants, quantity } = data;
+    const {
+      ticketId,
+      buyerName,
+      buyerEmail,
+      buyerPhone,
+      participants,
+      quantity,
+    } = data;
 
     // check the ticketId sent from frontend exists in the Tickets table
-    const ticket = await this.prisma.ticket.findUnique({ where: { id: ticketId } });
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+    });
     if (!ticket) throw new Error('Ticket not found');
 
     // calculate total amount
-    const totalAmount = ticket.price * quantity;
+    const totalAmount = ticket.fiat * quantity;
 
     // call helper function to create Razorpay order pass total amountas argument
     const razorpayOrder = await this.razorpayService.createOrder(totalAmount);
@@ -59,14 +68,23 @@ export class PaymentsService {
 
   // DAIMO ORDER CREATION
   async createDaimoOrder(data: any) {
-    const { ticketId, buyerName, buyerEmail, buyerPhone, participants, quantity } = data;
-        
+    const {
+      ticketId,
+      buyerName,
+      buyerEmail,
+      buyerPhone,
+      participants,
+      quantity,
+    } = data;
+
     // check the ticketId sent from frontend exists in the Tickets table
-    const ticket = await this.prisma.ticket.findUnique({ where: { id: ticketId } });
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+    });
     if (!ticket) throw new Error('Ticket not found');
 
     // calculate total amount
-    const totalAmount = ticket.price * quantity;
+    const totalAmount = ticket.crypto * quantity;
 
     // call helper function to create Daimo Pay order and pass total amountas argument
     const daimoOrder = await this.daimoService.createOrder(totalAmount);
@@ -80,6 +98,7 @@ export class PaymentsService {
         buyerPhone,
         amount: totalAmount,
         paymentType: PaymentType.DAIMO,
+        currency: 'USDC',
         daimoPaymentId: daimoOrder.paymentId, // from Daimo response
         participants: {
           create: participants.map((p) => ({
@@ -96,7 +115,6 @@ export class PaymentsService {
     return {
       success: true,
       paymentId: daimoOrder.paymentId,
-    //   paymentUrl: res.data.paymentUrl, need to confirm with diksha
       order,
     };
   }
@@ -104,16 +122,22 @@ export class PaymentsService {
   // 🔹 VERIFY (Razorpay OR Daimo)
   async verifyPayment(body: any) {
     if (body.paymentType === 'DAIMO') {
-      const res = await axios.get(`https://api.daimo.xyz/api/payment/${body.paymentId}`, {
-        headers: { Authorization: `Bearer ${process.env.DAIMO_API_KEY}` },
-      });
+      const res = await axios.get(
+        `https://api.daimo.xyz/api/payment/${body.paymentId}`,
+        {
+          headers: { Authorization: `Bearer ${process.env.DAIMO_API_KEY}` },
+        },
+      );
 
       if (res.data.payment.status === 'payment_complete') {
         await this.prisma.order.updateMany({
           where: { daimoPaymentId: body.paymentId },
           data: { status: 'paid' },
         });
-        return { success: true, message: 'Daimo payment verified successfully' };
+        return {
+          success: true,
+          message: 'Daimo payment verified successfully',
+        };
       } else {
         return { success: false, message: 'Payment not completed yet' };
       }
