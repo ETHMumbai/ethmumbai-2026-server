@@ -11,8 +11,6 @@ services:
     startCommand: npm run start:prod
     autoDeploy: true
     envVars:
-      - key: DATABASE_URL
-        fromDatabase: ethmumbai-db
       - key: NODE_ENV
         value: production
 
@@ -20,4 +18,3 @@ databases:
   - name: ethmumbai-db
     plan: starter
     region: oregon
-    postgresVersion: 17
