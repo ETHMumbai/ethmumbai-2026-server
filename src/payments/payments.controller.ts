@@ -17,9 +17,9 @@ export class PaymentsController {
     return await this.paymentsService.createDaimoOrder(body);
   }
 
-  // 🔹 Verify payments (both Razorpay & Daimo)
+  // Verify payments (both Razorpay & Daimo)
   @Post('verify')
   async verifyPayment(@Body() body: any) {
-    return await this.paymentsService.verifyPayment(body);
+    return await this.paymentsService.verifySignature(body);
   }
 }

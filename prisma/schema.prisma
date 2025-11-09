@@ -68,7 +68,6 @@ model Participant {
   order     Order    @relation(fields: [orderId], references: [id])
 }
 
-//
 // =======================
 // Payment Type Enum
 // =======================

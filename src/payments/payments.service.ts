@@ -10,36 +10,26 @@ export class PaymentsService {
   constructor(
     private prisma: PrismaService,
     private razorpayService: RazorpayService,
-    private daimoService: DaimoService,
+     private daimoService: DaimoService,
   ) {}
 
-  // RAZORPAY ORDER CREATION
   async createRazorpayOrder(data: any) {
-    const {
-      ticketId,
-      buyerName,
-      buyerEmail,
-      buyerPhone,
-      participants,
-      quantity,
-    } = data;
+    const { ticketId, buyerName, buyerEmail, buyerPhone, participants, quantity } = data;
 
-    // check the ticketId sent from frontend exists in the Tickets table
-    const ticket = await this.prisma.ticket.findUnique({
-      where: { id: ticketId },
-    });
+    // Fetch the ticket
+    const ticket = await this.prisma.ticket.findUnique({ where: { id: ticketId } });
     if (!ticket) throw new Error('Ticket not found');
 
-    // calculate total amount
-    const totalAmount = ticket.fiat * quantity;
+    // Calculate total amount
+    const totalAmount = ticket.price * quantity;
 
-    // call helper function to create Razorpay order pass total amountas argument
+    // Create order in Razorpay
     const razorpayOrder = await this.razorpayService.createOrder(totalAmount);
 
-    // create an order in th Orders table with response from razorpay
+    // Save order in DB
     const order = await this.prisma.order.create({
       data: {
-        razorpayOrderId: razorpayOrder.id, // from Razorpay response
+        razorpayOrderId: razorpayOrder.id,
         ticketId,
         buyerName,
         buyerEmail,
@@ -57,7 +47,7 @@ export class PaymentsService {
       include: { participants: true },
     });
 
-    // return back the response to frontend
+    // Return combined response
     return {
       razorpayOrderId: razorpayOrder.id,
       amount: totalAmount,
