@@ -7,6 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+//
 // =======================
 // Tickets Table
 // =======================
@@ -14,34 +15,47 @@ model Ticket {
   id       Int      @id @default(autoincrement())
   title    String   @unique
   type     String   // "earlybird" or "standard"
-  price    Float
+  fiat     Float   @default(999)
+  crypto   Float   @default(12)
   quantity Int
   orders   Order[]
 }
 
+//
 // =======================
 // Order Table
 // =======================
 model Order {
   id                 Int          @id @default(autoincrement())
-  razorpayOrderId    String?      // Razorpay order id
-  daimoTxHash        String?      // Daimo transaction hash
+
+  // Razorpay fields
+  razorpayOrderId    String?      // Razorpay: order_id
+  razorpayPaymentId  String?      // Razorpay: payment_id
+
+  // Daimo fields
+  daimoPaymentId     String?      // Daimo: payId
+  daimoTxHash        String?      // Daimo: blockchain transaction hash
+
+  // Common order info
   ticketId           Int
   buyerName          String
   buyerEmail         String
   buyerPhone         String
   amount             Float
-  currency           String       @default("INR")
+  currency           String       @default("INR") // INR or CRYPTO (USDC)
   status             String       @default("created") // created, attempted, paid, failed
   paymentType        PaymentType?
   paymentVerified    Boolean       @default(false)
+
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
+  // Relations
   ticket             Ticket        @relation(fields: [ticketId], references: [id])
   participants       Participant[]
 }
 
+//
 // =======================
 // Participant Table
 // =======================
@@ -53,7 +67,6 @@ model Participant {
   isBuyer   Boolean  @default(false) // true if this participant is the buyer
   order     Order    @relation(fields: [orderId], references: [id])
 }
-
 
 // =======================
 // Payment Type Enum
