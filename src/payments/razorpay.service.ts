@@ -1,67 +1,54 @@
-// import { Injectable, BadRequestException } from '@nestjs/common';
-// import Razorpay from 'razorpay';
-// import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, BadRequestException } from '@nestjs/common';
+import * as crypto from 'crypto';
+import Razorpay from 'razorpay';
 
-// @Injectable()
-// export class RazorpayService {
-//   private razorpay: Razorpay;
+@Injectable()
+export class RazorpayService {
+  private razorpay: Razorpay;
 
-//   constructor(private prisma: PrismaService) {
-//     this.razorpay = new Razorpay({
-//       key_id: process.env.RAZORPAY_KEY_ID,
-//       key_secret: process.env.RAZORPAY_KEY_SECRET,
-//     });
-//   }
+  constructor() {
+    this.razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
 
-//   // Create Razorpay order
-//   async createOrder(order: any) {
-//     const options = {
-//       amount: Math.round(order.amount * 100), // INR in paise
-//       currency: 'INR',
-//       receipt: `order_rcpt_${order.id}`,
-//     };
+  async createOrder(amount: number, currency = 'INR') {
+    const options = {
+      amount: Math.round(amount * 100), // Razorpay expects amount in paise
+      currency,
+      receipt: `rcpt_${Date.now()}`,
+      notes: {},
+    };
 
-//     const razorpayOrder = await this.razorpay.orders.create(options);
+    const order = await this.razorpay.orders.create(options);
+    return order;
+  }
 
-//     // Save razorpayOrderId to Payment table
-//     await this.prisma.payment.create({
-//       data: {
-//         orderId: order.id,
-//         razorpayOrderId: razorpayOrder.id,
-//         status: 'created',
-//       },
-//     });
+  verifySignature(
+    razorpay_order_id: string,
+    razorpay_payment_id: string,
+    razorpay_signature: string,
+  ) {
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      throw new BadRequestException('Missing Razorpay verification fields');
+    }
 
-//     return razorpayOrder;
-//   }
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!keySecret) {
+      throw new Error('RAZORPAY_KEY_SECRET environment variable is not set');
+    }
+    const expectedSignature = crypto
+      .createHmac('sha256', keySecret)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest('hex');
 
-//   // Verify Razorpay payment
-//   async verify(dto: any) {
-//     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = dto;
+    const isValid = expectedSignature === razorpay_signature;
 
-//     // Fetch Payment record
-//     const payment = await this.prisma.payment.findFirst({
-//       where: { razorpayOrderId: razorpay_order_id },
-//       include: { order: true },
-//     });
-//     if (!payment) throw new BadRequestException('Payment record not found');
+    if (!isValid) {
+      throw new BadRequestException('Invalid Razorpay signature');
+    }
 
-//     // TODO: verify signature using HMAC
-//     // If valid:
-//     await this.prisma.payment.update({
-//       where: { id: payment.id },
-//       data: {
-//         razorpayPaymentId: razorpay_payment_id,
-//         verified: true,
-//         status: 'paid',
-//       },
-//     });
-
-//     await this.prisma.order.update({
-//       where: { id: payment.orderId },
-//       data: { status: 'paid' },
-//     });
-
-//     return { success: true };
-//   }
-// }
+    return { success: true, message: 'Payment verified successfully' };
+  }
+}

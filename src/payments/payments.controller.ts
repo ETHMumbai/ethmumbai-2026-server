@@ -1,29 +1,25 @@
-import { Controller, Post, Body, Get } from '@nestjs/common';
+import { Body, Controller, Post } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
-  @Get()
-  getPage(): string {
-    return 'Reached Payment controller';
+  // Razorpay order creation
+  @Post('order')
+  async createRazorpayOrder(@Body() body: any) {
+    return await this.paymentsService.createRazorpayOrder(body);
   }
 
+  // Daimo order creation
   @Post('create-order')
-  async createOrder(
-    @Body()
-    dto: {
-      cartId: string;
-      paymentType: 'RAZORPAY' | 'DAIMO';
-    },
-  ) {
-    // console.log('The cart Id from request is: ', dto.cartId);
-    return this.paymentsService.createOrder(dto.cartId, dto.paymentType);
+  async createDaimoOrder(@Body() body: any) {
+    return await this.paymentsService.createDaimoOrder(body);
   }
 
+  // 🔹 Verify payments (both Razorpay & Daimo)
   @Post('verify')
-  async verifyPayment(@Body() dto: any) {
-    return this.paymentsService.verifyPayment(dto);
+  async verifyPayment(@Body() body: any) {
+    return await this.paymentsService.verifyPayment(body);
   }
 }

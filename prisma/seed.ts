@@ -7,13 +7,15 @@ async function main() {
     {
       title: 'Early Bird',
       type: 'earlybird',
-      price: 999,
-      quantity: 100, 
+      fiat: 999,
+      crypto: 12,
+      quantity: 100,
     },
     {
       title: 'Standard',
       type: 'standard',
-      price: 1999,
+      fiat: 1999,
+      crypto: 24,
       quantity: 500,
     },
   ];
@@ -22,7 +24,8 @@ async function main() {
     await prisma.ticket.upsert({
       where: { title: ticket.title },
       update: {
-        price: ticket.price,
+        fiat: ticket.fiat,
+        crypto: ticket.crypto,
         quantity: ticket.quantity,
       },
       create: ticket,

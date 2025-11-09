@@ -7,6 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+//
 // =======================
 // Tickets Table
 // =======================
@@ -14,94 +15,64 @@ model Ticket {
   id       Int      @id @default(autoincrement())
   title    String   @unique
   type     String   // "earlybird" or "standard"
-  price    Float
+  fiat     Float   @default(999)
+  crypto   Float   @default(12)
   quantity Int
-  carts    Cart[]    // back-relation to Cart
-  orders   Order[]   // back-relation to Order
+  orders   Order[]
 }
 
+//
 // =======================
-// Cart Table
+// Order Table
 // =======================
-model Cart {
-  id           String        @id @default(cuid())
-  ticketId     Int
-  quantity     Int
-  participants Participant[]
-  order        Order?        // optional link to Order
-  ticket       Ticket        @relation(fields: [ticketId], references: [id])
-  createdAt    DateTime      @default(now())
+model Order {
+  id                 Int          @id @default(autoincrement())
+
+  // Razorpay fields
+  razorpayOrderId    String?      // Razorpay: order_id
+  razorpayPaymentId  String?      // Razorpay: payment_id
+
+  // Daimo fields
+  daimoPaymentId     String?      // Daimo: payId
+  daimoTxHash        String?      // Daimo: blockchain transaction hash
+
+  // Common order info
+  ticketId           Int
+  buyerName          String
+  buyerEmail         String
+  buyerPhone         String
+  amount             Float
+  currency           String       @default("INR") // INR or CRYPTO (USDC)
+  status             String       @default("created") // created, attempted, paid, failed
+  paymentType        PaymentType?
+  paymentVerified    Boolean       @default(false)
+
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  // Relations
+  ticket             Ticket        @relation(fields: [ticketId], references: [id])
+  participants       Participant[]
 }
 
+//
 // =======================
 // Participant Table
 // =======================
 model Participant {
-  id       Int      @id @default(autoincrement())
-  cartId   String
-  name     String
-  email    String?
-  isBuyer  Boolean  @default(false) // marks the buyer
-  phone    String                    // buyer contact
-  cart     Cart    @relation(fields: [cartId], references: [id])
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  name      String
+  email     String?
+  isBuyer   Boolean  @default(false) // true if this participant is the buyer
+  order     Order    @relation(fields: [orderId], references: [id])
 }
 
-// =======================
-// Order Table (new)
-// =======================
-model Order {
-  id          Int          @id @default(autoincrement())
-  cartId      String       @unique
-  ticketId    Int
-  amount      Float
-  currency    CurrencyType @default(INR)
-  status      String       @default("created") // created, attempted, paid, failed
-  paymentType PaymentType
-  payment     Payment?
-
-  cart        Cart         @relation(fields: [cartId], references: [id])
-  ticket      Ticket       @relation(fields: [ticketId], references: [id])
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-}
-
-
-// =======================
-// Payment Table (new)
-// =======================
-model Payment {
-  id               Int          @id @default(autoincrement())
-  orderId          Int          @unique
-  vendor           PaymentType  // RAZORPAY | DAIMO
-  vendorPaymentId  String?      // Razorpay: payment_id | Daimo: payId
-  vendorOrderId    String?      // Razorpay: order_id | Daimo: optional
-  vendorTxHash     String?      // Daimo: tx hash
-  amount           Float
-  currency         String       // e.g. "INR", "USDC", "USD"
-  status           String       @default("created")
-  verified         Boolean      @default(false)
-  rawPayload       Json?        // 💥 Store full response from vendor API
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-
-  order            Order        @relation(fields: [orderId], references: [id])
-}
-
-
-
+//
 // =======================
 // Payment Type Enum
 // =======================
 enum PaymentType {
   RAZORPAY
   DAIMO
-}
-
-
-// =======================
-// Currency Type Enum
-// =======================
-enum CurrencyType {
-  INR
-  CRYPTO
 }
