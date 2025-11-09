@@ -29,13 +29,13 @@ model Order {
   id                 String             @id @default(uuid())  
 
   // Razorpay fields
-  razorpayOrderId    String?            // Razorpay: order_id
-  razorpayPaymentId  String?            // Razorpay: payment_id
-  razorpaySignature  String?            // Razorpay: signature_id
+  razorpayOrderId    String?            @unique   // Razorpay: order_id
+  razorpayPaymentId  String?            @unique   // Razorpay: payment_id
+  razorpaySignature  String?            @unique   // Razorpay: signature_id
 
   // Daimo fields
-  daimoPaymentId     String?            // Daimo: payId
-  daimoTxHash        String?            // Daimo: blockchain transaction hash
+  daimoPaymentId     String?            @unique   // Daimo: payId
+  daimoTxHash        String?            @unique   // Daimo: blockchain transaction hash
 
   // Common order info
   ticketId           String

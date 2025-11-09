@@ -1,5 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { generateTicketCode } from '../utils/ticket.utils';
 import { PrismaService } from '../prisma/prisma.service';
+import { TicketsService } from '../tickets/tickets.service';
 import { RazorpayService } from './razorpay.service';
 import { DaimoService } from './daimo.service';
 import { PaymentType } from '@prisma/client';
@@ -10,6 +12,7 @@ export class PaymentsService {
     private prisma: PrismaService,
     private razorpayService: RazorpayService,
     private daimoService: DaimoService,
+    private ticketsService: TicketsService,
   ) {}
 
   async createRazorpayOrder(data: any) {
@@ -140,14 +143,20 @@ export class PaymentsService {
   async verifySignature(body: any) {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
 
-    const verifyResult = this.razorpayService.verifySignature(
+    const verifyResult = await this.razorpayService.verifySignature(
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
     );
 
     if (verifyResult.success) {
-      await this.prisma.order.updateMany({
+      const order = await this.prisma.order.findFirst({
+        where: { razorpayOrderId: razorpay_order_id },
+      });
+
+      if (!order) throw new BadRequestException('Order not found');
+      
+      await this.prisma.order.update({
         where: { razorpayOrderId: razorpay_order_id },
         data: {
           paymentVerified: true,
@@ -156,6 +165,9 @@ export class PaymentsService {
           razorpaySignature: razorpay_signature,
         },
       });
+
+      // Generate tickets through TicketsService
+      await this.ticketsService.generateTicketsForOrder(order.id);
     }
 
     return verifyResult;
