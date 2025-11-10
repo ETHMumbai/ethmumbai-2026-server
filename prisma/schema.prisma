@@ -86,6 +86,8 @@ model GeneratedTicket {
 
   participant Participant               @relation(fields: [participantId], references: [id])
   order       Order                     @relation(fields: [orderId], references: [id])
+
+  createdAt          DateTime           @default(now())
 }
 
 // =======================
