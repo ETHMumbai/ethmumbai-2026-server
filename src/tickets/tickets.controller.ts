@@ -1,6 +1,13 @@
-import { Controller, Get, Query, UseGuards, Headers } from '@nestjs/common';
-import { ApiKeyGuard } from '../utils/api-key-auth';
+import {
+  Controller,
+  Get,
+  Query,
+  UseGuards,
+  Headers,
+  Param,
+} from '@nestjs/common';
 import { TicketsService } from './tickets.service';
+
 @Controller('t')
 export class TicketsController {
   constructor(private readonly ticketService: TicketsService) {}
@@ -11,9 +18,9 @@ export class TicketsController {
   // async verify(@Query('token') token: string) {
   //   return await this.ticketService.verifyAndMark(token);
   // }
-  @Get('/')
+  @Get('/:token')
   async verify(
-    @Query('token') token: string,
+    @Param('token') token: string,
     @Headers('x-scanner-key') key: string,
   ) {
     const allowed = process.env.SCANNER_KEY || '';

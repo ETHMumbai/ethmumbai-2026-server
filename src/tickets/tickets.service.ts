@@ -71,7 +71,7 @@ export class TicketsService {
     const qrHash = crypto.createHash('sha256').update(ticketCode).digest('hex');
 
     // build ticket URL and QR (embedded with ticketCode)
-    const ticketUrl = `${process.env.APP_BASE_URL || 'http://localhost:3000'}/t?token=${ticketCode}`;
+    const ticketUrl = `${process.env.APP_BASE_URL || 'http://localhost:3000'}/t/${ticketCode}`;
 
     // QR as base64
     const dataUrl = await QRCode.toDataURL(ticketUrl, {
