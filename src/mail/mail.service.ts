@@ -1,52 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
+import { LoopsService } from './loops.service';
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private transporter: nodemailer.Transporter;
 
-  constructor(private prisma: PrismaService) {
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: false, // to update later with STARTTLS
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
-  }
+  constructor(
+    private prisma: PrismaService,
+    private loops: LoopsService,
+  ) { }
 
-  // Load HTML template from src/mail/templates
-  private loadTemplate(templateName: string): string {
-    const possiblePaths = [
-      path.join(process.cwd(), 'src', 'mail', 'templates', `${templateName}.html`),
-      path.join(process.cwd(), 'dist', 'src', 'mail', 'templates', `${templateName}.html`),
-    ];
-
-    for (const p of possiblePaths) {
-      if (fs.existsSync(p)) {
-        return fs.readFileSync(p, 'utf8');
-      }
-    }
-
-    throw new Error(`Template not found for ${templateName}`);
-  }
-
-  // Inject template variables
-  private inject(template: string, vars: Record<string, string>): string {
-    return Object.entries(vars).reduce(
-      (acc, [key, val]) => acc.replaceAll(`{{${key}}}`, val ?? ''),
-      template,
-    );
-  }
-
-
-  // Send buyer confirmation email with all participants listed.
+  // send buyer confirmatiom email with order summary
   async sendBuyerEmail(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -58,40 +25,44 @@ export class MailService {
       return;
     }
 
+    const BUYER_TEMPLATE = process.env.LOOPS_BUYER_EMAIL_ID;
+    if (!BUYER_TEMPLATE) {
+      this.logger.error('Missing env: LOOPS_BUYER_EMAIL_ID');
+      return;
+    }
+
     const participantsList = order.participants
       .map(
         (p) =>
-          `<li>${p.name} (${p.email}) - Ticket Code: <b>${p.generatedTicket?.ticketCode ?? 'Pending'
-          }</b></li>`,
+          `${p.name} (${p.email}) - Ticket: ${p.generatedTicket?.ticketCode ?? 'Pending'}`
       )
-      .join('');
+      .join('\n');
 
-    const html = this.inject(this.loadTemplate('buyer-email'), {
-      buyerName: order.buyerName,
-      orderId: order.id,
-      paymentId: order.razorpayPaymentId ?? order.daimoPaymentId ?? 'N/A',
-      amount: order.amount.toString(),
-      currency: order.currency,
-      status: order.status,
-      participantsList,
-    });
+    const resp = await this.loops.sendTransactionalEmail(
+      BUYER_TEMPLATE,
+      order.buyerEmail,
+      {
+        buyerName: order.buyerName,
+        orderId: order.id,
+        paymentId: order.razorpayPaymentId ?? order.daimoPaymentId ?? 'N/A',
+        amount: order.amount.toString(),
+        currency: order.currency,
+        status: order.status,
+        participantsList,
+      }
+    );
 
-    await this.transporter.sendMail({
-      from: process.env.MAIL_FROM,
-      to: order.buyerEmail,
-      subject: '🎟️ ETHMumbai Order Confirmation',
-      html,
-    });
+    if (!resp?.success) {
+      this.logger.error(`Failed to send buyer confirmation → ${order.buyerEmail}`);
+      return;
+    }
 
     await this.prisma.order.update({
       where: { id: order.id },
-      data: {
-        buyerEmailSent: true,
-        buyerEmailSentAt: new Date(),
-      },
+      data: { buyerEmailSent: true, buyerEmailSentAt: new Date() },
     });
 
-    this.logger.log(`Buyer email sent to ${order.buyerEmail}`);
+    this.logger.log(`Buyer email sent → ${order.buyerEmail}`);
   }
 
   // Send ticket emails to each participant with their unique ticket code.
@@ -101,57 +72,62 @@ export class MailService {
       include: { generatedTicket: true },
     });
 
-    if (participants.length === 0) {
+    if (!participants.length) {
       this.logger.warn(`No participants pending email for order ${orderId}`);
       return;
     }
 
-    const template = this.loadTemplate('participant-email');
+    const PARTICIPANT_TEMPLATE = process.env.LOOPS_PARTICIPANT_EMAIL_ID;
+    if (!PARTICIPANT_TEMPLATE) {
+      this.logger.error('Missing env: LOOPS_PARTICIPANT_EMAIL_ID');
+      return;
+    }
 
     for (const p of participants) {
       if (!p.email) continue;
 
       const ticketCode = p.generatedTicket?.ticketCode;
 
-      const html = this.inject(template, {
-        name: p.name,
-        orderId,
-        ticketCode: ticketCode ?? 'Pending',
-      });
+      // Load QR file as base64
+      const qrPath = path.join(process.cwd(), 'src', 'qr', `${ticketCode}.png`);
+      let attachment: {
+        filename: string;
+        contentType: string;
+        data: string;
+      } | null = null;
 
-      const qrPath = path.join(
-        process.cwd(),
-        'qr',
-        'tickets',
-        `${ticketCode}.png`,
-      );
-
-      let attachments: nodemailer.Attachment[] = [];
       if (fs.existsSync(qrPath)) {
-        attachments.push({
+        const fileData = fs.readFileSync(qrPath);
+        attachment = {
           filename: `${ticketCode}.png`,
-          path: qrPath,
           contentType: 'image/png',
-        });
-      } else {
-        this.logger.warn(`QR not found for ${p.email} at ${qrPath}`);
+          data: fileData.toString('base64'),
+        };
       }
 
-      await this.transporter.sendMail({
-        from: process.env.MAIL_FROM,
-        to: p.email,
-        subject: '🎟️ Your ETHMumbai Ticket',
-        html,
-        attachments, 
-      });
+      const resp = await this.loops.sendTransactionalEmail(
+        PARTICIPANT_TEMPLATE,
+        p.email,
+        {
+          name: p.name,
+          orderId,
+          ticketCode: ticketCode,
+          tickectCode: ticketCode,
+        },
+        attachment ? [attachment] : [],
+      );
+
+      if (!resp?.success) {
+        this.logger.error(`Failed sending participant email → ${p.email}`);
+        continue;
+      }
 
       await this.prisma.participant.update({
         where: { id: p.id },
         data: { emailSent: true, emailSentAt: new Date() },
       });
 
-      this.logger.log(`Ticket email sent to ${p.email} (with QR)`);
+      this.logger.log(`Participant email sent → ${p.email}`);
     }
   }
-
 }
