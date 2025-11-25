@@ -17,12 +17,18 @@ export class TicketsService {
   ) {}
 
   //Generates a unique, non-reversible ticket code based on participant email + randomness
-  private generateTicketCode(email: string): string {
-    const hash = crypto.createHash('sha256').update(email).digest('hex');
-    const shortHash = hash.substring(0, 8);
-    const random = Math.random().toString(36).substring(2, 6);
-    return `${shortHash}-${random}`.toUpperCase();
+  private async generateTicketCode(): Promise<string> {
+  while (true) {
+    const code = crypto.randomBytes(4).toString('hex').substring(0, 6).toUpperCase();
+
+    const exists = await this.prisma.generatedTicket.findUnique({
+      where: { ticketCode: code },
+    });
+
+    if (!exists) return code; // unique → return it
   }
+}
+
 
   // Generates a ticket for each participant in a given order.
   async generateTicketsForOrder(orderId: string) {
