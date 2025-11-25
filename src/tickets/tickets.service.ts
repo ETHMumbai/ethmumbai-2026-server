@@ -109,48 +109,23 @@ export class TicketsService {
     });
 
     if (result) {
-      // check existence and display check in details
+      //get ticket type and buyer info
+      const orderInfo = await this.prisma.order.findFirst({
+        where: { id: result.orderId },
+      });
+      const ticketType = await this.prisma.ticket.findFirst({
+        where: { id: orderInfo?.ticketId },
+      });
+      // get participant info
       const p = await this.prisma.participant.findFirst({
         where: { id: result.participantId },
       });
       if (!p) throw new NotFoundException('Invalid token');
-      return (
-        'Hello ' + p.name + '! Welcome to ETHMumbai. You have been checked in.'
-      );
+      return {
+        participantName: p?.name || 'Participant',
+        ticketTypeTitle: ticketType?.title || 'Ticket',
+        buyerName: orderInfo?.buyerName || 'Buyer',
+      };
     }
-
-    return 'Token Invalid' + token;
-  }
-  //Fallback for Manual Check In
-  async checkInFallback(token: string) {
-    const ticket = await this.prisma.generatedTicket.findFirst({
-      where: {
-        ticketCode: token,
-      },
-    });
-
-    const participant = await this.prisma.participant.findFirst({
-      where: {
-        id: ticket?.participantId,
-      },
-    });
-
-    const order = await this.prisma.order.findFirst({
-      where: {
-        id: ticket?.orderId,
-      },
-    });
-
-    const ticketType = await this.prisma.ticket.findFirst({
-      where: {
-        id: order?.ticketId,
-      },
-    });
-
-    const participantName = participant?.name || 'Participant';
-    const buyerName = order?.buyerName || 'Buyer';
-    const ticketTypeTitle = ticketType?.title || 'Ticket';
-
-    return { participantName, ticketTypeTitle, buyerName };
   }
 }

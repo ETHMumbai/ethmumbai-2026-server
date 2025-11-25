@@ -16,7 +16,9 @@ export class ApiKeyGuard implements CanActivate {
     const allowed = process.env.SCANNER_KEY || '';
 
     if (!providedKey || !allowed.includes(providedKey)) {
-      throw new UnauthorizedException('Unauthorised access');
+      throw new UnauthorizedException(
+        'The BEST Conference is waiting for you! Use this ticket at the check-in. See you there!',
+      );
     }
     return true;
   }
