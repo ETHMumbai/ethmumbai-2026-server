@@ -18,38 +18,28 @@ model Ticket {
 }
 
 model Order {
-  id                 String             @id @default(uuid())  
-
-  // Razorpay fields
-  razorpayOrderId    String?            @unique   // Razorpay: order_id
-  razorpayPaymentId  String?            @unique   // Razorpay: payment_id
-  razorpaySignature  String?            @unique   // Razorpay: signature_id
-
-  // Daimo fields
-  daimoPaymentId     String?            @unique   // Daimo: payId
-  daimoTxHash        String?            @unique   // Daimo: blockchain transaction hash
-
-  // Common order info
-  ticketId           String
-  buyerName          String
-  buyerEmail         String
-  buyerPhone         String
-  amount             Float
-  currency           String             @default("INR") // INR or CRYPTO (USDC)
-  status             String             @default("created") // created, attempted, paid, failed
-  paymentType        PaymentType?
-  paymentVerified    Boolean            @default(false)
-
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-
-  buyerEmailSent     Boolean             @default(false)
-  buyerEmailSentAt   DateTime?
-
-  // Relations
-  ticket             Ticket             @relation(fields: [ticketId], references: [id])
-  generatedTickets   GeneratedTicket[]        
-  participants       Participant[]
+  id                String            @id @default(uuid())
+  razorpayOrderId   String?           @unique
+  razorpayPaymentId String?           @unique
+  daimoPaymentId    String?           @unique
+  daimoTxHash       String?           @unique
+  buyerName         String
+  buyerEmail        String
+  buyerPhone        String
+  amount            Float
+  currency          String            @default("INR")
+  status            String            @default("created")
+  paymentType       PaymentType?
+  paymentVerified   Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  razorpaySignature String?           @unique
+  ticketId          String
+  buyerEmailSent    Boolean           @default(false)
+  buyerEmailSentAt  DateTime?
+  generatedTickets  GeneratedTicket[]
+  ticket            Ticket            @relation(fields: [ticketId], references: [id])
+  participants      Participant[]
 }
 
 model Participant {
@@ -58,11 +48,10 @@ model Participant {
   name            String
   email           String?          @unique
   isBuyer         Boolean          @default(false)
-  generatedTicket GeneratedTicket?
-  order           Order                 @relation(fields: [orderId], references: [id])
-
-  emailSent       Boolean             @default(false)
+  emailSent       Boolean          @default(false)
   emailSentAt     DateTime?
+  generatedTicket GeneratedTicket?
+  order           Order            @relation(fields: [orderId], references: [id])
 }
 
 model GeneratedTicket {
@@ -71,9 +60,10 @@ model GeneratedTicket {
   participantId String      @unique
   orderId       String
 
-  qrHash        String?            
-  checkedIn     Boolean     @default(false)  //for check-in
-  checkedInAt   DateTime    @default(now())  //for check-in
+  checkedIn     Boolean     @default(false)
+  checkedInAt   DateTime    @default(now())
+  qrHash        String      @unique
+  qrUrl         String?
 
   order         Order       @relation(fields: [orderId], references: [id])
   participant   Participant @relation(fields: [participantId], references: [id])
