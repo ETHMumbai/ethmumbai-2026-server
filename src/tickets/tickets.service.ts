@@ -18,17 +18,20 @@ export class TicketsService {
 
   //Generates a unique, non-reversible ticket code based on participant email + randomness
   private async generateTicketCode(): Promise<string> {
-  while (true) {
-    const code = crypto.randomBytes(4).toString('hex').substring(0, 6).toUpperCase();
+    while (true) {
+      const code = crypto
+        .randomBytes(4)
+        .toString('hex')
+        .substring(0, 6)
+        .toUpperCase();
 
-    const exists = await this.prisma.generatedTicket.findUnique({
-      where: { ticketCode: code },
-    });
+      const exists = await this.prisma.generatedTicket.findUnique({
+        where: { ticketCode: code },
+      });
 
-    if (!exists) return code; // unique → return it
+      if (!exists) return code; // unique → return it
+    }
   }
-}
-
 
   // Generates a ticket for each participant in a given order.
   async generateTicketsForOrder(orderId: string) {
@@ -42,7 +45,7 @@ export class TicketsService {
     const generatedTickets = await Promise.all(
       order.participants.map(async (participant) => {
         // Generate unique ticket code
-        const ticketCode = this.generateTicketCode(participant.email ?? '');
+        const ticketCode = await this.generateTicketCode();
         // Call QR generation function
         const { dataUrl, ticketUrl, qrHash } =
           await this.generateQRforTicket(ticketCode);
