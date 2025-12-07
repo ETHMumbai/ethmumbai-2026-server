@@ -70,6 +70,45 @@ export class InternalController {
     };
   }
 
+  @Get('orders/success/:orderId')
+  async getOrderForSuccessPage(@Param('orderId') orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        participants: {
+          include: { generatedTicket: true }
+        },
+        ticket: true
+      }
+    });
+
+    if (!order) {
+      throw new BadRequestException('Order not found');
+    }
+
+    return {
+      success: true,
+      order: {
+        orderId: order.id,
+        transactionId: order.razorpayPaymentId || order.daimoPaymentId || 'N/A',
+        status: order.status,
+        ticketType: order.ticket.title,
+        quantity: order.participants.length,
+        paymentMethod: order.paymentType,
+        purchaseDate: order.createdAt,
+        totalAmount: order.amount,
+        currency: order.currency,
+        buyerName: order.buyerName,
+        buyerEmail: order.buyerEmail,
+        participants: order.participants.map(p => ({
+          name: p.name,
+          email: p.email,
+          ticketCode: p.generatedTicket?.ticketCode || 'Pending'
+        }))
+      }
+    };
+  }
+
   // --- Transactions ---
 
   @Get('transactions')
