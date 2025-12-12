@@ -93,7 +93,7 @@ export class MailService {
       const ticketCode = p.generatedTicket?.ticketCode;
 
       // Path to QR file
-      const qrPath = path.join(__dirname, '../qr', `${ticketCode}.png`);
+      const qrPath = path.join(__dirname, '../qr/tickets', `${ticketCode}.png`);
       let attachment: {
         filename: string;
         contentType: string;
