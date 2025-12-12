@@ -11,9 +11,11 @@ export class MailService {
   constructor(
     private prisma: PrismaService,
     private loops: LoopsService,
-  ) { }
+  ) {}
 
-  // send buyer confirmatiom email with order summary
+  // ---------------------------------------------
+  // BUYER CONFIRMATION EMAIL
+  // ---------------------------------------------
   async sendBuyerEmail(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -65,7 +67,9 @@ export class MailService {
     this.logger.log(`Buyer email sent → ${order.buyerEmail}`);
   }
 
-  // Send ticket emails to each participant with their unique ticket code.
+  // ---------------------------------------------
+  // PARTICIPANT TICKET EMAILS (with QR attachment)
+  // ---------------------------------------------
   async sendParticipantEmails(orderId: string) {
     const participants = await this.prisma.participant.findMany({
       where: { orderId, emailSent: false },
@@ -88,23 +92,36 @@ export class MailService {
 
       const ticketCode = p.generatedTicket?.ticketCode;
 
-      // Load QR file as base64
-      const qrPath = path.join(process.cwd(), 'src', 'qr', `${ticketCode}.png`);
+      // Path to QR file
+      const qrPath = path.join(__dirname, '../qr', `${ticketCode}.png`);
       let attachment: {
         filename: string;
         contentType: string;
         data: string;
       } | null = null;
 
+      // Read QR file as base64
       if (fs.existsSync(qrPath)) {
-        const fileData = fs.readFileSync(qrPath);
-        attachment = {
-          filename: `${ticketCode}.png`,
-          contentType: 'image/png',
-          data: fileData.toString('base64'),
-        };
+        try {
+          const fileData = fs.readFileSync(qrPath);
+
+          if (fileData.length === 0) {
+            this.logger.error(`QR file is empty: ${qrPath}`);
+          } else {
+            attachment = {
+              filename: `${ticketCode}.png`,
+              contentType: 'image/png',
+              data: fileData.toString('base64'),
+            };
+          }
+        } catch (err) {
+          this.logger.error(`Error reading QR file for ${ticketCode}: ${err}`);
+        }
+      } else {
+        this.logger.warn(`QR code missing → ${qrPath}`);
       }
 
+      // SEND EMAIL
       const resp = await this.loops.sendTransactionalEmail(
         PARTICIPANT_TEMPLATE,
         p.email,
@@ -112,7 +129,6 @@ export class MailService {
           name: p.name,
           orderId,
           ticketCode: ticketCode,
-          tickectCode: ticketCode,
         },
         attachment ? [attachment] : [],
       );
@@ -122,6 +138,7 @@ export class MailService {
         continue;
       }
 
+      // Mark as sent
       await this.prisma.participant.update({
         where: { id: p.id },
         data: { emailSent: true, emailSentAt: new Date() },
