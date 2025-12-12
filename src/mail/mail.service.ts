@@ -3,17 +3,21 @@ import * as nodemailer from 'nodemailer';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
+import { PdfService } from '../tickets/pdf.service';
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
   private transporter: nodemailer.Transporter;
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private pdfService: PdfService,
+  ) {
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT) || 587,
-      secure: false, // to update later with STARTTLS
+      secure: false,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
@@ -21,11 +25,23 @@ export class MailService {
     });
   }
 
-  // Load HTML template from src/mail/templates
   private loadTemplate(templateName: string): string {
     const possiblePaths = [
-      path.join(process.cwd(), 'src', 'mail', 'templates', `${templateName}.html`),
-      path.join(process.cwd(), 'dist', 'src', 'mail', 'templates', `${templateName}.html`),
+      path.join(
+        process.cwd(),
+        'src',
+        'mail',
+        'templates',
+        `${templateName}.html`,
+      ),
+      path.join(
+        process.cwd(),
+        'dist',
+        'src',
+        'mail',
+        'templates',
+        `${templateName}.html`,
+      ),
     ];
 
     for (const p of possiblePaths) {
@@ -37,7 +53,6 @@ export class MailService {
     throw new Error(`Template not found for ${templateName}`);
   }
 
-  // Inject template variables
   private inject(template: string, vars: Record<string, string>): string {
     return Object.entries(vars).reduce(
       (acc, [key, val]) => acc.replaceAll(`{{${key}}}`, val ?? ''),
@@ -45,8 +60,6 @@ export class MailService {
     );
   }
 
-
-  // Send buyer confirmation email with all participants listed.
   async sendBuyerEmail(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -61,7 +74,8 @@ export class MailService {
     const participantsList = order.participants
       .map(
         (p) =>
-          `<li>${p.name} (${p.email}) - Ticket Code: <b>${p.generatedTicket?.ticketCode ?? 'Pending'
+          `<li>${p.name} (${p.email}) - Ticket Code: <b>${
+            p.generatedTicket?.ticketCode ?? 'Pending'
           }</b></li>`,
       )
       .join('');
@@ -94,7 +108,6 @@ export class MailService {
     this.logger.log(`Buyer email sent to ${order.buyerEmail}`);
   }
 
-  // Send ticket emails to each participant with their unique ticket code.
   async sendParticipantEmails(orderId: string) {
     const participants = await this.prisma.participant.findMany({
       where: { orderId, emailSent: false },
@@ -111,38 +124,33 @@ export class MailService {
     for (const p of participants) {
       if (!p.email) continue;
 
-      const ticketCode = p.generatedTicket?.ticketCode;
+      const ticketCode = p.generatedTicket?.ticketCode ?? 'Pending';
 
       const html = this.inject(template, {
         name: p.name,
         orderId,
-        ticketCode: ticketCode ?? 'Pending',
+        ticketCode: ticketCode,
       });
 
-      const qrPath = path.join(
-        process.cwd(),
-        'qr',
-        'tickets',
-        `${ticketCode}.png`,
-      );
-
-      let attachments: nodemailer.Attachment[] = [];
-      if (fs.existsSync(qrPath)) {
-        attachments.push({
-          filename: `${ticketCode}.png`,
-          path: qrPath,
-          contentType: 'image/png',
-        });
-      } else {
-        this.logger.warn(`QR not found for ${p.email} at ${qrPath}`);
-      }
+      // 🎯 GENERATE PDF
+      const pdfBuffer = await this.pdfService.generateTicketPdf({
+        name: p.name,
+        ticketCode: ticketCode,
+        orderId: orderId,
+      });
 
       await this.transporter.sendMail({
         from: process.env.MAIL_FROM,
         to: p.email,
         subject: '🎟️ Your ETHMumbai Ticket',
         html,
-        attachments, 
+        attachments: [
+          {
+            filename: `ETHMumbai-Ticket-${ticketCode}.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf',
+          },
+        ],
       });
 
       await this.prisma.participant.update({
@@ -150,8 +158,7 @@ export class MailService {
         data: { emailSent: true, emailSentAt: new Date() },
       });
 
-      this.logger.log(`Ticket email sent to ${p.email} (with QR)`);
+      this.logger.log(`Ticket email with PDF sent to ${p.email}`);
     }
   }
-
 }
