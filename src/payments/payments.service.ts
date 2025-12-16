@@ -18,9 +18,10 @@ export class PaymentsService {
   async createRazorpayOrder(data: any) {
     const {
       ticketType,
-      buyerName,
-      buyerEmail,
-      buyerPhone,
+      buyer,
+      // buyerName,
+      // buyerEmail,
+      // buyerPhone,
       participants,
       quantity,
     } = data;
@@ -41,10 +42,26 @@ export class PaymentsService {
     const order = await this.prisma.order.create({
       data: {
         razorpayOrderId: razorpayOrder.id,
-        ticketId: ticket.id,
-        buyerName,
-        buyerEmail,
-        buyerPhone,
+        ticket: {
+          connect: { id: ticket.id },
+        },
+        buyer: {
+          create: {
+            firstName: buyer.firstName,
+            lastName: buyer.lastName ?? null,
+            email: buyer.email,
+            address: {
+              create: {
+                line1: buyer.address.line1,
+                line2: buyer.address.line2 ?? null,
+                city: buyer.address.city,
+                state: buyer.address.state,
+                country: buyer.address.country,
+                postalCode: buyer.address.postalCode,
+              },
+            },
+          },
+        },
         amount: totalAmount,
         currency: 'INR',
         paymentType: PaymentType.RAZORPAY,
@@ -59,6 +76,27 @@ export class PaymentsService {
       include: { participants: true },
     });
 
+    // const order = await this.prisma.order.create({
+    //   data: {
+    //     razorpayOrderId: razorpayOrder.id,
+    //     ticketId: ticket.id,
+    //     buyerName,
+    //     buyerEmail,
+    //     buyerPhone,
+    //     amount: totalAmount,
+    //     currency: 'INR',
+    //     paymentType: PaymentType.RAZORPAY,
+    //     participants: {
+    //       create: participants.map((p) => ({
+    //         name: p.name,
+    //         email: p.email,
+    //         isBuyer: p.isBuyer ?? false,
+    //       })),
+    //     },
+    //   },
+    //   include: { participants: true },
+    // });
+
     // Return combined response
     return {
       success: true,
@@ -72,14 +110,7 @@ export class PaymentsService {
 
   // DAIMO ORDER CREATION
   async createDaimoOrder(data: any) {
-    const {
-      ticketType,
-      buyerName,
-      buyerEmail,
-      buyerPhone,
-      participants,
-      quantity,
-    } = data;
+    const { ticketType, buyer, participants, quantity } = data;
 
     // check the ticketId sent from frontend exists in the Tickets table
     const ticket = await this.prisma.ticket.findFirst({
@@ -97,16 +128,33 @@ export class PaymentsService {
     const order = await this.prisma.order.create({
       data: {
         daimoPaymentId: daimoOrder.paymentId,
-        ticketId: ticket.id,
-        buyerName,
-        buyerEmail,
-        buyerPhone,
+        ticket: {
+          connect: { id: ticket.id },
+        },
+        buyer: {
+          create: {
+            firstName: buyer.firstName,
+            lastName: buyer.lastName ?? null,
+            email: buyer.email,
+            address: {
+              create: {
+                line1: buyer.address.line1,
+                line2: buyer.address.line2 ?? null,
+                city: buyer.address.city,
+                state: buyer.address.state,
+                country: buyer.address.country,
+                postalCode: buyer.address.postalCode,
+              },
+            },
+          },
+        },
         amount: totalAmount,
         currency: 'USDC',
         paymentType: PaymentType.DAIMO,
         participants: {
           create: participants.map((p) => ({
-            name: p.name,
+            firstName: p.firstName,
+            lastName: p.lastName,
             email: p.email,
             isBuyer: p.isBuyer ?? false,
           })),

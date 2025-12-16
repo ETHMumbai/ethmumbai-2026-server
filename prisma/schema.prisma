@@ -23,9 +23,8 @@ model Order {
   razorpayPaymentId String?           @unique
   daimoPaymentId    String?           @unique
   daimoTxHash       String?           @unique
-  buyerName         String
-  buyerEmail        String
-  buyerPhone        String
+  buyerId           String            @unique
+  buyer             Buyer             @relation(fields: [buyerId], references: [id])
   amount            Float
   currency          String            @default("INR")
   status            String            @default("created")
@@ -42,11 +41,44 @@ model Order {
   participants      Participant[]
 }
 
+model Buyer {
+  id        String   @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String   @unique
+
+  address   Address?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+ 
+  order     Order?
+}
+
+model Address {
+  id           String  @id @default(uuid())
+
+  line1        String
+  line2        String?
+  city         String
+  state        String
+  country      String
+  postalCode   String
+
+  buyerId      String  @unique
+  buyer        Buyer   @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 model Participant {
   id              String           @id @default(uuid())
   orderId         String
-  name            String
+  firstName       String?
+  lastName        String?
   email           String?          @unique
+  organisation    String?
   isBuyer         Boolean          @default(false)
   emailSent       Boolean          @default(false)
   emailSentAt     DateTime?

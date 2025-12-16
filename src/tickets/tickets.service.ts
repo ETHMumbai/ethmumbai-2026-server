@@ -69,6 +69,9 @@ export class TicketsService {
         // Get PNG buffer for QR image
         // getPngBufferFromDataUrl(dataUrl);
 
+        //save QR as PNG
+        // savePngFromDataUrl(dataUrl, filePath);
+
         //for validation in dev with x-scanner-key
         console.log(ticketUrl);
       }),
@@ -126,6 +129,9 @@ export class TicketsService {
       //get ticket type and buyer info
       const orderInfo = await this.prisma.order.findFirst({
         where: { id: result.orderId },
+        include: {
+          buyer: true,
+        },
       });
       const ticketType = await this.prisma.ticket.findFirst({
         where: { id: orderInfo?.ticketId },
@@ -136,9 +142,9 @@ export class TicketsService {
       });
       if (!p) throw new NotFoundException('Invalid token');
       return {
-        participantName: p?.name || 'Participant',
+        participantName: p?.firstName || 'Participant',
         ticketTypeTitle: ticketType?.title || 'Ticket',
-        buyerName: orderInfo?.buyerName || 'Buyer',
+        buyerName: orderInfo?.buyer.firstName || 'Buyer',
       };
     }
   }

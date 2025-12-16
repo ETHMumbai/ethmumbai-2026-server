@@ -19,7 +19,10 @@ export class MailService {
   async sendBuyerEmail(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { participants: { include: { generatedTicket: true } } },
+      include: {
+        buyer: true,
+        participants: { include: { generatedTicket: true } },
+      },
     });
 
     if (!order) {
@@ -36,26 +39,28 @@ export class MailService {
     const participantsList = order.participants
       .map(
         (p) =>
-          `${p.name} (${p.email}) - Ticket: ${p.generatedTicket?.ticketCode ?? 'Pending'}`
+          `${p.firstName} (${p.email}) - Ticket: ${p.generatedTicket?.ticketCode ?? 'Pending'}`,
       )
       .join('\n');
 
     const resp = await this.loops.sendTransactionalEmail(
       BUYER_TEMPLATE,
-      order.buyerEmail,
+      order.buyer.email,
       {
-        buyerName: order.buyerName,
+        buyerName: order.buyer.firstName,
         orderId: order.id,
         paymentId: order.razorpayPaymentId ?? order.daimoPaymentId ?? 'N/A',
         amount: order.amount.toString(),
         currency: order.currency,
         status: order.status,
         participantsList,
-      }
+      },
     );
 
     if (!resp?.success) {
-      this.logger.error(`Failed to send buyer confirmation → ${order.buyerEmail}`);
+      this.logger.error(
+        `Failed to send buyer confirmation → ${order.buyer.email}`,
+      );
       return;
     }
 
@@ -64,7 +69,7 @@ export class MailService {
       data: { buyerEmailSent: true, buyerEmailSentAt: new Date() },
     });
 
-    this.logger.log(`Buyer email sent → ${order.buyerEmail}`);
+    this.logger.log(`Buyer email sent → ${order.buyer.email}`);
   }
 
   // ---------------------------------------------
@@ -126,7 +131,7 @@ export class MailService {
         PARTICIPANT_TEMPLATE,
         p.email,
         {
-          name: p.name,
+          name: p.firstName,
           orderId,
           ticketCode: ticketCode,
         },
