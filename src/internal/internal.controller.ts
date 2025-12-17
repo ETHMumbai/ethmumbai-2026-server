@@ -5,14 +5,20 @@ import {
   Post,
   UseGuards,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
+import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
-
+import { AdminGuard } from 'src/utils/admin.guard';
+import { ApiKeyGuard } from 'src/utils/api-key-auth';
 
 @Controller('internal')
 // @UseGuards(AdminGuard)
+@UseGuards(ApiKeyGuard)
 export class InternalController {
+  private readonly DAIMO_API_URL = 'https://pay.daimo.com/api/payment';
+  private readonly DAIMO_API_KEY = process.env.DAIMO_API_KEY;
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
@@ -50,9 +56,13 @@ export class InternalController {
 
   @Get('orders/buyer/:email')
   async getOrderByBuyer(@Param('email') email: string) {
-    return this.prisma.order.findMany({
-      where: { buyerEmail: email },
-      include: { participants: { include: { generatedTicket: true } } },
+    return this.prisma.buyer.findFirst({
+      where: { email: email },
+      include: {
+        order: {
+          include: { participants: { include: { generatedTicket: true } } },
+        },
+      },
     });
   }
 
@@ -68,6 +78,104 @@ export class InternalController {
       order: participant.order,
       ticket: participant.generatedTicket,
     };
+  }
+
+  // ---------------- BUYERS ----------------
+
+  // GET /internal/buyers
+  @Get('buyers')
+  async getAllBuyers() {
+    return this.prisma.buyer.findMany({
+      include: {
+        address: true,
+        order: {
+          include: {
+            participants: true,
+          },
+        },
+      },
+      orderBy: { id: 'desc' },
+    });
+  }
+
+  // GET /internal/buyers/:id
+  @Get('buyers/:id')
+  async getBuyerById(@Param('id') id: string) {
+    const buyer = await this.prisma.buyer.findUnique({
+      where: { id },
+      include: {
+        address: true,
+        order: {
+          include: {
+            participants: true,
+          },
+        },
+      },
+    });
+
+    if (!buyer) throw new BadRequestException('Buyer not found');
+    return buyer;
+  }
+
+  // GET /internal/buyers/search?email=
+  @Get('buyers/search')
+  async searchBuyer(@Query('email') email: string) {
+    if (!email) {
+      throw new BadRequestException('Email query param required');
+    }
+
+    return this.prisma.buyer.findMany({
+      where: {
+        email: { contains: email, mode: 'insensitive' },
+      },
+      include: {
+        order: true,
+      },
+    });
+  }
+
+  // ---------------- TICKETS ----------------
+
+  // POST /internal/tickets/:code/verify
+  @Post('tickets/:code/verify')
+  async verifyTicket(@Param('code') code: string) {
+    const ticket = await this.prisma.generatedTicket.findUnique({
+      where: { ticketCode: code },
+    });
+
+    if (!ticket) throw new BadRequestException('Ticket not found');
+    if (ticket.checkedIn) {
+      throw new BadRequestException('Ticket already checkedIn');
+    }
+
+    await this.prisma.generatedTicket.update({
+      where: { ticketCode: code },
+      data: {
+        checkedIn: true,
+        checkedInAt: new Date(),
+      },
+    });
+
+    return { success: true, message: 'Ticket Checked In' };
+  }
+
+  // POST /internal/tickets/:code/unverify
+  @Post('tickets/:code/unverify')
+  async unverifyTicket(@Param('code') code: string) {
+    const ticket = await this.prisma.generatedTicket.findUnique({
+      where: { ticketCode: code },
+    });
+
+    if (!ticket) throw new BadRequestException('Ticket not found');
+
+    await this.prisma.generatedTicket.update({
+      where: { ticketCode: code },
+      data: {
+        checkedIn: false,
+      },
+    });
+
+    return { success: true, message: 'Ticket unverified' };
   }
 
   // --- Transactions ---
@@ -90,8 +198,42 @@ export class InternalController {
     });
   }
 
-  // --- Emails ---
+  // GET /payments/status/:orderId
+  @Get('payments/status/:orderId')
+  async getPaymentStatus(@Param('orderId') orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        status: true,
+        paymentType: true,
+        amount: true,
+        currency: true,
+      },
+    });
 
+    if (!order) throw new BadRequestException('Order not found');
+
+    return order;
+  }
+
+  @Get('payments/daimo/:payId')
+  async getPaymentWithPayId(@Param('payId') payId: string) {
+    try {
+      const response = await axios.get(`${this.DAIMO_API_URL}/${payId}`, {
+        headers: {
+          'Api-Key': this.DAIMO_API_KEY,
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      throw new BadRequestException(
+        error?.response?.data || 'Failed to fetch Daimo payment',
+      );
+    }
+  }
+
+  // --- Emails ---
   @Post('email/buyer/:orderId')
   async resendBuyerEmail(@Param('orderId') orderId: string) {
     await this.mailService.sendBuyerEmail(orderId);
