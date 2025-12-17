@@ -77,8 +77,8 @@ export class TicketsService {
       }),
     );
 
-    await this.mailService.sendBuyerEmail(orderId);
-    await this.mailService.sendParticipantEmails(orderId);
+    // await this.mailService.sendBuyerEmail(orderId);
+    // await this.mailService.sendParticipantEmails(orderId);
 
     return generatedTickets;
   }

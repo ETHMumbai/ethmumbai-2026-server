@@ -5,6 +5,7 @@ import { TicketsService } from '../tickets/tickets.service';
 import { RazorpayService } from './razorpay.service';
 import { DaimoService } from './daimo.service';
 import { PaymentType } from '@prisma/client';
+import { InvoiceService } from 'src/invoice/invoice.service';
 
 @Injectable()
 export class PaymentsService {
@@ -13,6 +14,7 @@ export class PaymentsService {
     private razorpayService: RazorpayService,
     private daimoService: DaimoService,
     private ticketsService: TicketsService,
+    private invoiceService: InvoiceService,
   ) {}
 
   async createRazorpayOrder(data: any) {
@@ -210,6 +212,8 @@ export class PaymentsService {
 
       // Generate tickets through TicketsService
       await this.ticketsService.generateTicketsForOrder(order.id);
+
+      await this.invoiceService.generateInvoice(order.id);
     }
 
     return verifyResult;

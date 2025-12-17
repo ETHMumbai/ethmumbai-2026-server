@@ -7,6 +7,7 @@ import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { ethereumUSDC } from '@daimo/pay-common';
+import { InvoiceService } from 'src/invoice/invoice.service';
 
 @Injectable()
 export class DaimoService {
@@ -17,6 +18,7 @@ export class DaimoService {
   constructor(
     private prisma: PrismaService,
     private ticketsService: TicketsService,
+    private invoiceService: InvoiceService,
   ) {}
 
   /**
@@ -103,6 +105,8 @@ export class DaimoService {
         });
         if (orderComplete?.id) {
           await this.ticketsService.generateTicketsForOrder(orderComplete.id);
+
+          await this.invoiceService.generateInvoice(orderComplete.id);
         }
       }
 
