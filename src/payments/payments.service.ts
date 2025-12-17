@@ -69,8 +69,10 @@ export class PaymentsService {
         paymentType: PaymentType.RAZORPAY,
         participants: {
           create: participants.map((p) => ({
-            name: p.name,
+            firstName: p.firstName,
+            lastName: p.lastName,
             email: p.email,
+            organisation: p.organisation || '',
             isBuyer: p.isBuyer ?? false,
           })),
         },
@@ -210,10 +212,17 @@ export class PaymentsService {
         },
       });
 
+      // Generate invoice
+      await this.invoiceService.generateInvoice(order.id);
+
       // Generate tickets through TicketsService
       await this.ticketsService.generateTicketsForOrder(order.id);
 
-      await this.invoiceService.generateInvoice(order.id);
+      return {
+        success: true,
+        message: 'Payment verified successfully',
+        orderId: order.id,
+      };
     }
 
     return verifyResult;
