@@ -240,9 +240,9 @@ export class InternalController {
     return { success: true, message: 'Buyer email resent' };
   }
 
-  @Post('email/participants/:orderId')
-  async resendParticipantEmails(@Param('orderId') orderId: string) {
-    await this.mailService.sendParticipantEmails(orderId);
-    return { success: true, message: 'Participant emails resent' };
-  }
+  // @Post('email/participants/:orderId')
+  // async resendParticipantEmails(@Param('orderId') orderId: string) {
+  //   await this.mailService.sendParticipantEmails(orderId);
+  //   return { success: true, message: 'Participant emails resent' };
+  // }
 }
