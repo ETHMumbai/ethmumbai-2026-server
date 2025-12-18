@@ -75,7 +75,10 @@ export class MailService {
   // ---------------------------------------------
   // PARTICIPANT TICKET EMAILS (with QR attachment)
   // ---------------------------------------------
-  async sendParticipantEmails(orderId: string) {
+  async sendParticipantEmails(
+    orderId: string,
+    pdfMap: Map<string, Buffer>, // ticketCode → PDF buffer
+  ) {
     const participants = await this.prisma.participant.findMany({
       where: { orderId, emailSent: false },
       include: { generatedTicket: true },
@@ -86,8 +89,8 @@ export class MailService {
       return;
     }
 
-    const PARTICIPANT_TEMPLATE = process.env.LOOPS_PARTICIPANT_EMAIL_ID;
-    if (!PARTICIPANT_TEMPLATE) {
+    const templateId = process.env.LOOPS_PARTICIPANT_EMAIL_ID;
+    if (!templateId) {
       this.logger.error('Missing env: LOOPS_PARTICIPANT_EMAIL_ID');
       return;
     }
@@ -96,50 +99,33 @@ export class MailService {
       if (!p.email) continue;
 
       const ticketCode = p.generatedTicket?.ticketCode;
+      if (!ticketCode) continue;
 
-      // Path to QR file
-      const qrPath = path.join(__dirname, '../qr/tickets', `${ticketCode}.png`);
-      let attachment: {
-        filename: string;
-        contentType: string;
-        data: string;
-      } | null = null;
-
-      // Read QR file as base64
-      if (fs.existsSync(qrPath)) {
-        try {
-          const fileData = fs.readFileSync(qrPath);
-
-          if (fileData.length === 0) {
-            this.logger.error(`QR file is empty: ${qrPath}`);
-          } else {
-            attachment = {
-              filename: `${ticketCode}.png`,
-              contentType: 'image/png',
-              data: fileData.toString('base64'),
-            };
-          }
-        } catch (err) {
-          this.logger.error(`Error reading QR file for ${ticketCode}: ${err}`);
-        }
-      } else {
-        this.logger.warn(`QR code missing → ${qrPath}`);
+      const pdfBuffer = pdfMap.get(ticketCode);
+      if (!pdfBuffer) {
+        this.logger.error(`Missing PDF buffer for ticket ${ticketCode}`);
+        continue;
       }
 
-      // SEND EMAIL
+      const attachment = {
+        filename: `ETHMumbai-Ticket-${ticketCode}.pdf`,
+        contentType: 'application/pdf',
+        data: pdfBuffer.toString('base64'),
+      };
+
       const resp = await this.loops.sendTransactionalEmail(
-        PARTICIPANT_TEMPLATE,
+        templateId,
         p.email,
         {
           name: p.firstName,
           orderId,
-          ticketCode: ticketCode,
+          ticketCode,
         },
-        attachment ? [attachment] : [],
+        [attachment],
       );
 
       if (!resp?.success) {
-        this.logger.error(`Failed sending participant email → ${p.email}`);
+        this.logger.error(`Failed sending ticket → ${p.email}`);
         continue;
       }
 
@@ -149,7 +135,7 @@ export class MailService {
         data: { emailSent: true, emailSentAt: new Date() },
       });
 
-      this.logger.log(`Participant email sent → ${p.email}`);
+      this.logger.log(`Ticket PDF sent → ${p.email}`);
     }
   }
 }
