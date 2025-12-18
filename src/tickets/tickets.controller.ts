@@ -7,8 +7,14 @@ import {
   Body,
   Post,
   Param,
+  Res,
 } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
+import type { Response } from 'express';
+import * as QRCode from 'qrcode';
+import { generateTicketPDF } from './generateTicket';
+import PDFDocument from 'pdfkit';
+import * as path from 'path';
 import { ApiKeyGuard } from '../utils/api-key-auth';
 
 @Controller('t')
@@ -33,5 +39,33 @@ export class TicketsController {
       ' paid for by ' +
       resp?.buyerName
     );
+  }
+
+  @Get('/preview/pdf')
+  async previewTicketPdf(
+    @Query('name') name: string,
+    @Query('ticketId') ticketId: string,
+    @Res() res: Response,
+  ) {
+    if (!name || !ticketId) {
+      return res.status(400).json({
+        error: 'name and ticketId are required',
+      });
+    }
+
+    const qrBuffer = await QRCode.toBuffer(ticketId);
+
+    const pdfDoc = generateTicketPDF({
+      name,
+      ticketId,
+      qrImage: qrBuffer,
+    });
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="ticket-${ticketId}.pdf"`,
+    });
+
+    pdfDoc.pipe(res);
   }
 }

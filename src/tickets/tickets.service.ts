@@ -1,3 +1,4 @@
+// tickets.service.ts
 import {
   Injectable,
   NotFoundException,
@@ -7,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as QRCode from 'qrcode';
 import { MailService } from '../mail/mail.service';
 import * as crypto from 'crypto';
+import { generateTicketPDFBuffer } from './generateTicket';
 import {
   getPngBufferFromDataUrl,
   savePngFromDataUrl,
@@ -19,7 +21,6 @@ export class TicketsService {
     private mailService: MailService,
   ) {}
 
-  //Generates a unique, non-reversible ticket code based on participant email + randomness
   private async generateTicketCode(): Promise<string> {
     while (true) {
       const code = crypto
@@ -32,11 +33,10 @@ export class TicketsService {
         where: { ticketCode: code },
       });
 
-      if (!exists) return code; // unique → return it
+      if (!exists) return code;
     }
   }
 
-  // Generates a ticket for each participant in a given order.
   async generateTicketsForOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -45,24 +45,39 @@ export class TicketsService {
 
     if (!order) throw new NotFoundException('Order not found');
 
-    const generatedTickets = await Promise.all(
+    const pdfMap = new Map<string, Buffer>();
+
+    await Promise.all(
       order.participants.map(async (participant) => {
-        // Generate unique ticket code
         const ticketCode = await this.generateTicketCode();
-        // Call QR generation function
-        const { dataUrl, ticketUrl, qrHash } =
+
+        const { ticketUrl, qrHash } =
           await this.generateQRforTicket(ticketCode);
-        // Create ticket entry
+
         await this.prisma.generatedTicket.create({
           data: {
-            ticketCode: ticketCode,
+            ticketCode,
             participantId: participant.id,
-            qrHash: qrHash,
+            qrHash,
             qrUrl: ticketUrl,
             orderId: order.id,
           },
         });
 
+        // QR AS BUFFER ONLY
+        const qrImageBuffer = await QRCode.toBuffer(ticketUrl, {
+          width: 220,
+          errorCorrectionLevel: 'M',
+        });
+
+        // PDF BUFFER
+        const pdfBuffer = await generateTicketPDFBuffer({
+          name: participant.firstName || 'Participant',
+          ticketId: ticketCode,
+          qrImage: qrImageBuffer,
+        });
+
+        pdfMap.set(ticketCode, pdfBuffer);
         // convert dataURL → PNG file (example path)
         // const filePath = `./qr/tickets/${ticketCode}.png`;
 
@@ -77,51 +92,40 @@ export class TicketsService {
       }),
     );
 
-    await this.mailService.sendBuyerEmail(orderId);
-    await this.mailService.sendParticipantEmails(orderId);
+    // SEND ALL PARTICIPANT PDFs
+    await this.mailService.sendParticipantEmails(orderId, pdfMap);
 
-    return generatedTickets;
+    // SEND BUYER CONFIRMATION
+    await this.mailService.sendBuyerEmail(orderId);
   }
 
   async generateQRforTicket(ticketCode: string) {
-    // store ticketCode hash in DB for checkIn
     const qrHash = crypto.createHash('sha256').update(ticketCode).digest('hex');
 
-    // build ticket URL and QR (embedded with ticketCode)
-    const ticketUrl = `${process.env.APP_BASE_URL || 'http://localhost:3000'}/t/${ticketCode}`;
+    const ticketUrl = `${
+      process.env.APP_BASE_URL || 'http://localhost:3000'
+    }/t/${ticketCode}`;
 
-    // QR as base64
-    const dataUrl = await QRCode.toDataURL(ticketUrl, {
-      width: 200,
-      errorCorrectionLevel: 'M',
-    });
-
-    return { dataUrl, ticketUrl, qrHash };
+    return { ticketUrl, qrHash };
   }
 
   async verifyAndMark(token: string) {
     if (!token) throw new BadRequestException('token required');
 
-    //get ticketCode hash
     const qrHash = crypto.createHash('sha256').update(token).digest('hex');
 
     const ticket = await this.prisma.generatedTicket.findFirst({
-      where: { qrHash: qrHash },
+      where: { qrHash },
     });
 
-    //check if participant doesn't exist
-    if (!ticket) {
-      throw new NotFoundException('Ticket not found');
-    }
+    if (!ticket) throw new NotFoundException('Ticket not found');
 
-    //check if participant already checked-in
     if (ticket.checkedIn) {
       return { ok: false, reason: 'Participant is already checked in' };
     }
 
-    // atomic update: only mark used when checkedIn = false
     const result = await this.prisma.generatedTicket.update({
-      where: { qrHash: qrHash, checkedIn: false },
+      where: { qrHash, checkedIn: false },
       data: { checkedIn: true },
     });
 

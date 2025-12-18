@@ -13,6 +13,7 @@ export class DaimoService {
   private readonly DAIMO_API_URL = 'https://pay.daimo.com/api/payment';
   private readonly DAIMO_API_KEY = process.env.DAIMO_API_KEY;
   private readonly DESTINATION_ADDRESS = process.env.DAIMO_DESTINATION_ADDRESS;
+  private readonly REFUND_ADDRESS = process.env.DAIMO_REFUND_ADDRESS;
 
   constructor(
     private prisma: PrismaService,
@@ -32,6 +33,7 @@ export class DaimoService {
       const payload = {
         display: {
           intent: 'Checkout',
+          redirectUri: 'https://ethmumbai.in/',
         },
         destination: {
           destinationAddress: this.DESTINATION_ADDRESS,
@@ -39,6 +41,7 @@ export class DaimoService {
           tokenAddress: ethereumUSDC.token, // USDC
           amountUnits: amount.toString(), // <-- FIXED: amount passed from argument
         },
+        refundAddress: this.REFUND_ADDRESS,
         metadata: {
           system: 'ETHMumbai',
           currency: currency,
@@ -85,7 +88,7 @@ export class DaimoService {
 
       console.log('🧾 Daimo payment fetched:', payment);
 
-      const isComplete = true; //payment.status === 'payment_complete';
+      const isComplete = payment.status === 'payment_complete';
       // ✅ Update the order in DB based on paymentId
       await this.prisma.order.updateMany({
         where: { daimoPaymentId: paymentId },

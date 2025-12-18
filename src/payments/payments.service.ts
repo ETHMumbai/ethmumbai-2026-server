@@ -1,5 +1,8 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-// import { generateTicketCode } from '../utils/ticket.utils';
+import {
+  Injectable,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { RazorpayService } from './razorpay.service';
@@ -8,6 +11,8 @@ import { PaymentType } from '@prisma/client';
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
   constructor(
     private prisma: PrismaService,
     private razorpayService: RazorpayService,
@@ -15,36 +20,42 @@ export class PaymentsService {
     private ticketsService: TicketsService,
   ) {}
 
+  // --------------------------------------------------
+  // RAZORPAY ORDER
+  // --------------------------------------------------
   async createRazorpayOrder(data: any) {
-    const {
-      ticketType,
-      buyer,
-      // buyerName,
-      // buyerEmail,
-      // buyerPhone,
-      participants,
-      quantity,
-    } = data;
+    const { ticketType, buyer, participants, quantity } = data;
 
-    // Fetch the ticket
+    this.logger.log(
+      `Creating Razorpay order | ticketType=${ticketType} | qty=${quantity}`,
+    );
+
     const ticket = await this.prisma.ticket.findFirst({
       where: { type: ticketType },
     });
-    if (!ticket) throw new BadRequestException('Ticket not found');
 
-    // Calculate total amount
+    if (!ticket) {
+      this.logger.error(`Ticket not found | type=${ticketType}`);
+      throw new BadRequestException('Ticket not found');
+    }
+
     const totalAmount = ticket.fiat * quantity;
 
-    // Create order in Razorpay
-    const razorpayOrder = await this.razorpayService.createOrder(totalAmount);
+    this.logger.log(
+      `Calculated Razorpay amount: ₹${totalAmount} (${ticket.fiat} × ${quantity})`,
+    );
 
-    // Save order in DB
+    const razorpayOrder =
+      await this.razorpayService.createOrder(totalAmount);
+
+    this.logger.log(
+      `Razorpay order created | razorpayOrderId=${razorpayOrder.id}`,
+    );
+
     const order = await this.prisma.order.create({
       data: {
         razorpayOrderId: razorpayOrder.id,
-        ticket: {
-          connect: { id: ticket.id },
-        },
+        ticket: { connect: { id: ticket.id } },
         buyer: {
           create: {
             firstName: buyer.firstName,
@@ -67,7 +78,8 @@ export class PaymentsService {
         paymentType: PaymentType.RAZORPAY,
         participants: {
           create: participants.map((p) => ({
-            name: p.name,
+            firstName: p.firstName,
+            lastName: p.lastName,
             email: p.email,
             isBuyer: p.isBuyer ?? false,
           })),
@@ -76,28 +88,8 @@ export class PaymentsService {
       include: { participants: true },
     });
 
-    // const order = await this.prisma.order.create({
-    //   data: {
-    //     razorpayOrderId: razorpayOrder.id,
-    //     ticketId: ticket.id,
-    //     buyerName,
-    //     buyerEmail,
-    //     buyerPhone,
-    //     amount: totalAmount,
-    //     currency: 'INR',
-    //     paymentType: PaymentType.RAZORPAY,
-    //     participants: {
-    //       create: participants.map((p) => ({
-    //         name: p.name,
-    //         email: p.email,
-    //         isBuyer: p.isBuyer ?? false,
-    //       })),
-    //     },
-    //   },
-    //   include: { participants: true },
-    // });
+    this.logger.log(`Order saved | orderId=${order.id}`);
 
-    // Return combined response
     return {
       success: true,
       razorpayOrderId: razorpayOrder.id,
@@ -108,29 +100,41 @@ export class PaymentsService {
     };
   }
 
-  // DAIMO ORDER CREATION
+  // --------------------------------------------------
+  // DAIMO ORDER
+  // --------------------------------------------------
   async createDaimoOrder(data: any) {
     const { ticketType, buyer, participants, quantity } = data;
 
-    // check the ticketId sent from frontend exists in the Tickets table
+    this.logger.log(
+      `Creating Daimo order | ticketType=${ticketType} | qty=${quantity}`,
+    );
+
     const ticket = await this.prisma.ticket.findFirst({
       where: { type: ticketType },
     });
-    if (!ticket) throw new BadRequestException('Ticket not found');
 
-    // calculate total amount
-    const totalAmount = ticket.crypto * quantity; //0.1
+    if (!ticket) {
+      this.logger.error(`Ticket not found | type=${ticketType}`);
+      throw new BadRequestException('Ticket not found');
+    }
 
-    // call helper function to create Daimo Pay order and pass total amountas argument
+    const totalAmount = ticket.crypto * quantity;
+
+    this.logger.log(
+      `Calculated Daimo amount: ${totalAmount} USDC (${ticket.crypto} × ${quantity})`,
+    );
+
     const daimoOrder = await this.daimoService.createOrder(totalAmount);
 
-    // create an order in th Orders table with response from razorpay
+    this.logger.log(
+      `Daimo order created | paymentId=${daimoOrder.paymentId}`,
+    );
+
     const order = await this.prisma.order.create({
       data: {
         daimoPaymentId: daimoOrder.paymentId,
-        ticket: {
-          connect: { id: ticket.id },
-        },
+        ticket: { connect: { id: ticket.id } },
         buyer: {
           create: {
             firstName: buyer.firstName,
@@ -163,7 +167,8 @@ export class PaymentsService {
       include: { participants: true },
     });
 
-    // return back the response to frontend
+    this.logger.log(`Order saved | orderId=${order.id}`);
+
     return {
       success: true,
       paymentId: daimoOrder.paymentId,
@@ -172,18 +177,29 @@ export class PaymentsService {
     };
   }
 
-  // 🔹 VERIFY (Razorpay OR Daimo)
+  // --------------------------------------------------
+  // VERIFY PAYMENT
+  // --------------------------------------------------
   async verifyPayment(body: any) {
+    this.logger.log(`Verifying payment | type=${body.paymentType}`);
+
     if (body.paymentType === 'DAIMO') {
       return await this.daimoService.verifyPayment(body.paymentId);
     }
 
-    // Razorpay fallback
     return this.verifySignature(body);
   }
 
   async verifySignature(body: any) {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    } = body;
+
+    this.logger.log(
+      `Verifying Razorpay signature | orderId=${razorpay_order_id}`,
+    );
 
     const verifyResult = await this.razorpayService.verifySignature(
       razorpay_order_id,
@@ -191,26 +207,40 @@ export class PaymentsService {
       razorpay_signature,
     );
 
-    if (verifyResult.success) {
-      const order = await this.prisma.order.findFirst({
-        where: { razorpayOrderId: razorpay_order_id },
-      });
-
-      if (!order) throw new BadRequestException('Order not found');
-
-      await this.prisma.order.update({
-        where: { razorpayOrderId: razorpay_order_id },
-        data: {
-          paymentVerified: true,
-          status: 'paid',
-          razorpayPaymentId: razorpay_payment_id,
-          razorpaySignature: razorpay_signature,
-        },
-      });
-
-      // Generate tickets through TicketsService
-      await this.ticketsService.generateTicketsForOrder(order.id);
+    if (!verifyResult.success) {
+      this.logger.warn(
+        `Razorpay verification failed | orderId=${razorpay_order_id}`,
+      );
+      return verifyResult;
     }
+
+    const order = await this.prisma.order.findFirst({
+      where: { razorpayOrderId: razorpay_order_id },
+    });
+
+    if (!order) {
+      this.logger.error(
+        `Order not found after payment | razorpayOrderId=${razorpay_order_id}`,
+      );
+      throw new BadRequestException('Order not found');
+    }
+
+    await this.prisma.order.update({
+      where: { razorpayOrderId: razorpay_order_id },
+      data: {
+        paymentVerified: true,
+        status: 'paid',
+        razorpayPaymentId: razorpay_payment_id,
+        razorpaySignature: razorpay_signature,
+      },
+    });
+
+    this.logger.log(
+      `Payment verified & order marked paid | orderId=${order.id}`,
+    );
+
+    this.logger.log(`Generating tickets | orderId=${order.id}`);
+    await this.ticketsService.generateTicketsForOrder(order.id);
 
     return verifyResult;
   }
