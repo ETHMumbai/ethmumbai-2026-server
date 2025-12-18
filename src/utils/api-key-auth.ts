@@ -10,10 +10,10 @@ import { Request } from 'express';
 export class ApiKeyGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<Request>();
-    const providedKey = (req.header('x-scanner-key') || '') as string;
+    const providedKey = (req.header('x-api-key') || '') as string;
 
     // read allowed key from env
-    const allowed = process.env.SCANNER_KEY || '';
+    const allowed = process.env.AUTH_API_KEY || '';
 
     if (!providedKey || !allowed.includes(providedKey)) {
       throw new UnauthorizedException(
