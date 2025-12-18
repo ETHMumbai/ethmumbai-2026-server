@@ -1,0 +1,141 @@
+import { Injectable, Logger } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
+import { PrismaService } from '../prisma/prisma.service';
+import { LoopsService } from './loops.service';
+
+@Injectable()
+export class MailService {
+  private readonly logger = new Logger(MailService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private loops: LoopsService,
+  ) {}
+
+  // ---------------------------------------------
+  // BUYER CONFIRMATION EMAIL
+  // ---------------------------------------------
+  async sendBuyerEmail(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        buyer: true,
+        participants: { include: { generatedTicket: true } },
+      },
+    });
+
+    if (!order) {
+      this.logger.error(`Order not found: ${orderId}`);
+      return;
+    }
+
+    const BUYER_TEMPLATE = process.env.LOOPS_BUYER_EMAIL_ID;
+    if (!BUYER_TEMPLATE) {
+      this.logger.error('Missing env: LOOPS_BUYER_EMAIL_ID');
+      return;
+    }
+
+    const participantsList = order.participants
+      .map(
+        (p) =>
+          `${p.firstName} (${p.email}) - Ticket: ${p.generatedTicket?.ticketCode ?? 'Pending'}`,
+      )
+      .join('\n');
+
+    const resp = await this.loops.sendTransactionalEmail(
+      BUYER_TEMPLATE,
+      order.buyer.email,
+      {
+        buyerName: order.buyer.firstName,
+        orderId: order.id,
+        paymentId: order.razorpayPaymentId ?? order.daimoPaymentId ?? 'N/A',
+        amount: order.amount.toString(),
+        currency: order.currency,
+        status: order.status,
+        participantsList,
+      },
+    );
+
+    if (!resp?.success) {
+      this.logger.error(
+        `Failed to send buyer confirmation → ${order.buyer.email}`,
+      );
+      return;
+    }
+
+    await this.prisma.order.update({
+      where: { id: order.id },
+      data: { buyerEmailSent: true, buyerEmailSentAt: new Date() },
+    });
+
+    this.logger.log(`Buyer email sent → ${order.buyer.email}`);
+  }
+
+  // ---------------------------------------------
+  // PARTICIPANT TICKET EMAILS (with QR attachment)
+  // ---------------------------------------------
+  async sendParticipantEmails(
+    orderId: string,
+    pdfMap: Map<string, Buffer>, // ticketCode → PDF buffer
+  ) {
+    const participants = await this.prisma.participant.findMany({
+      where: { orderId, emailSent: false },
+      include: { generatedTicket: true },
+    });
+
+    if (!participants.length) {
+      this.logger.warn(`No participants pending email for order ${orderId}`);
+      return;
+    }
+
+    const templateId = process.env.LOOPS_PARTICIPANT_EMAIL_ID;
+    if (!templateId) {
+      this.logger.error('Missing env: LOOPS_PARTICIPANT_EMAIL_ID');
+      return;
+    }
+
+    for (const p of participants) {
+      if (!p.email) continue;
+
+      const ticketCode = p.generatedTicket?.ticketCode;
+      if (!ticketCode) continue;
+
+      const pdfBuffer = pdfMap.get(ticketCode);
+      if (!pdfBuffer) {
+        this.logger.error(`Missing PDF buffer for ticket ${ticketCode}`);
+        continue;
+      }
+
+      const attachment = {
+        filename: `ETHMumbai-Ticket-${ticketCode}.pdf`,
+        contentType: 'application/pdf',
+        data: pdfBuffer.toString('base64'),
+      };
+
+      const resp = await this.loops.sendTransactionalEmail(
+        templateId,
+        p.email,
+        {
+          name: p.firstName,
+          orderId,
+          ticketCode,
+        },
+        [attachment],
+      );
+
+      if (!resp?.success) {
+        this.logger.error(`Failed sending ticket → ${p.email}`);
+        continue;
+      }
+
+      // Mark as sent
+      await this.prisma.participant.update({
+        where: { id: p.id },
+        data: { emailSent: true, emailSentAt: new Date() },
+      });
+
+      this.logger.log(`Ticket PDF sent → ${p.email}`);
+    }
+  }
+}
