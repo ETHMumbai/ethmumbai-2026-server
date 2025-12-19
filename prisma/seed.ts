@@ -9,7 +9,7 @@ async function main() {
       type: 'earlybird',
       fiat: 99,
       crypto: 1.1,
-      quantity: 100,
+      quantity: 55,
     },
     {
       title: 'Standard',
