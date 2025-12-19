@@ -17,6 +17,7 @@ async function bootstrap() {
     ],
     credentials: true, // set true only if you use cookies/auth headers
   });
+  console.log('DATABASE_URL at startup:', process.env.DATABASE_URL);
 
   await app.listen(process.env.PORT ?? 3001);
   if (module.hot) {
