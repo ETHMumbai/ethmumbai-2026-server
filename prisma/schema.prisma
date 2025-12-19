@@ -46,7 +46,8 @@ model Buyer {
   id        String   @id @default(uuid())
   firstName String
   lastName  String
-  email     String   
+  email     String  
+  organisation  String? 
 
   address   Address?
 
