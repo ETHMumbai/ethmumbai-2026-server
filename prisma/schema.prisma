@@ -19,11 +19,12 @@ model Ticket {
 
 model Order {
   id                String            @id @default(uuid())
+  checkoutSessionId String            @unique
   razorpayOrderId   String?           @unique
   razorpayPaymentId String?           @unique
   daimoPaymentId    String?           @unique
   daimoTxHash       String?           @unique
-  buyerId           String            @unique
+  buyerId           String            
   buyer             Buyer             @relation(fields: [buyerId], references: [id])
   amount            Float
   currency          String            @default("INR")
@@ -52,7 +53,7 @@ model Buyer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
  
-  order     Order?
+  order     Order[]
 }
 
 model Address {
@@ -77,7 +78,7 @@ model Participant {
   orderId         String
   firstName       String?
   lastName        String?
-  email           String?          @unique
+  email           String          @unique
   organisation    String?
   isBuyer         Boolean          @default(false)
   emailSent       Boolean          @default(false)

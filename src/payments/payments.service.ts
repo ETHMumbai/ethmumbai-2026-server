@@ -23,7 +23,7 @@ export class PaymentsService {
   // RAZORPAY ORDER
   // --------------------------------------------------
   async createRazorpayOrder(data: any) {
-    const { ticketType, buyer, participants, quantity } = data;
+    const { ticketType, buyer, participants, quantity, checkoutSessionId } = data;
 
     this.logger.log(
       `Creating Razorpay order | ticketType=${ticketType} | qty=${quantity}`,
@@ -45,23 +45,27 @@ export class PaymentsService {
     );
 
     // -------------------------------
-    // Check for existing participant
+    // Check for existing Order
     // -------------------------------
-    const existingParticipant = await this.prisma.participant.findFirst({
-      where: { email: buyer.email },
-      include: { order: true },
+    const existingOrder = await this.prisma.order.findFirst({
+      where: {
+        checkoutSessionId,
+        paymentVerified: false,
+      },
+      include: { participants: true },
     });
 
-    if (existingParticipant && existingParticipant.order && !existingParticipant.order.paymentVerified) {
+
+    if (existingOrder) {
       // Update existing order
       const updatedRazorpayOrder = await this.razorpayService.createOrder(totalAmount);
 
       this.logger.log(
-        `Updating existing order | orderId=${existingParticipant.order.id} | newRazorpayOrderId=${updatedRazorpayOrder.id}`,
+        `Updating existing order | orderId=${existingOrder.id} | newRazorpayOrderId=${updatedRazorpayOrder.id}`,
       );
 
       const updatedOrder = await this.prisma.order.update({
-        where: { id: existingParticipant.order.id },
+        where: { id: existingOrder.id },
         data: {
           razorpayOrderId: updatedRazorpayOrder.id,
           amount: totalAmount,
@@ -114,6 +118,7 @@ export class PaymentsService {
     // Save order in DB
     const order = await this.prisma.order.create({
       data: {
+        checkoutSessionId,
         razorpayOrderId: razorpayOrder.id,
         ticket: { connect: { id: ticket.id } },
         buyer: {
@@ -164,7 +169,7 @@ export class PaymentsService {
   // DAIMO ORDER
   // --------------------------------------------------
   async createDaimoOrder(data: any) {
-    const { ticketType, buyer, participants, quantity } = data;
+    const { ticketType, buyer, participants, quantity, checkoutSessionId } = data;
 
     this.logger.log(
       `Creating Daimo order | ticketType=${ticketType} | qty=${quantity}`,
@@ -183,24 +188,29 @@ export class PaymentsService {
     );
 
     // -------------------------------
-    // Check for existing participant
+    // Check for existing Order
     // -------------------------------
-    const existingParticipant = await this.prisma.participant.findFirst({
-      where: { email: buyer.email },
-      include: { order: true },
+    const existingOrder = await this.prisma.order.findFirst({
+      where: {
+        checkoutSessionId,
+        paymentVerified: false,
+      },
+      include: { participants: true },
     });
 
-    if (existingParticipant && existingParticipant.order && !existingParticipant.order.paymentVerified) {
+
+    if (existingOrder) {
       // Update existing order
       const updatedDaimoOrder = await this.daimoService.createOrder(totalAmount);
 
       this.logger.log(
-        `Updating existing Daimo order | orderId=${existingParticipant.order.id} | newPaymentId=${updatedDaimoOrder.paymentId}`,
+        `Updating existing Daimo order | orderId=${existingOrder.id} | newPaymentId=${updatedDaimoOrder.paymentId}`,
       );
 
       const updatedOrder = await this.prisma.order.update({
-        where: { id: existingParticipant.order.id },
+        where: { id: existingOrder.id },
         data: {
+          checkoutSessionId,
           daimoPaymentId: updatedDaimoOrder.paymentId,
           amount: totalAmount,
           ticket: { connect: { id: ticket.id } },
@@ -253,6 +263,7 @@ export class PaymentsService {
 
     const order = await this.prisma.order.create({
       data: {
+        checkoutSessionId,
         daimoPaymentId: daimoOrder.paymentId,
         ticket: { connect: { id: ticket.id } },
         buyer: {
