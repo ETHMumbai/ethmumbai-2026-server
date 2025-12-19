@@ -10,7 +10,7 @@ import {
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
-import { AdminGuard } from 'src/utils/admin.guard';
+// import { AdminGuard } from 'src/utils/admin.guard';
 import { ApiKeyGuard } from 'src/utils/api-key-auth';
 
 @Controller('internal')
@@ -245,4 +245,50 @@ export class InternalController {
   //   await this.mailService.sendParticipantEmails(orderId);
   //   return { success: true, message: 'Participant emails resent' };
   // }
+
+  //success endpoint for order success page
+  @Get('orders/success/:orderId')
+  async getOrderForSuccessPage(@Param('orderId') orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        buyer: {
+          include: { address: true },
+        },
+        participants: {
+          include: { generatedTicket: true },
+        },
+        ticket: true,
+      },
+    });
+
+    if (!order) {
+      throw new BadRequestException('Order not found');
+    }
+
+    return {
+      success: true,
+      order: {
+        orderId: order.id,
+        transactionId: order.razorpayPaymentId || order.daimoPaymentId || 'N/A',
+        status: order.status,
+        ticketType: order.ticket.title,
+        quantity: order.participants.length,
+        paymentMethod:
+          order.paymentType === 'RAZORPAY'
+            ? 'Credit/Debit Card'
+            : 'Crypto (USDC)',
+        purchaseDate: order.createdAt,
+        totalAmount: order.amount,
+        currency: order.currency,
+        buyerEmail: order.buyer.email,
+        buyerName: `${order.buyer.firstName} ${order.buyer.lastName}`,
+        participants: order.participants.map((p) => ({
+          name: `${p.firstName} ${p.lastName}`,
+          email: p.email,
+          ticketCode: p.generatedTicket?.ticketCode || 'Pending',
+        })),
+      },
+    };
+  }
 }
