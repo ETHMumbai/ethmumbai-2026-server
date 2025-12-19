@@ -7,8 +7,8 @@ async function main() {
     {
       title: 'Early Bird',
       type: 'earlybird',
-      fiat: 999,
-      crypto: 12,
+      fiat: 99,
+      crypto: 1.1,
       quantity: 100,
     },
     {
