@@ -10,7 +10,7 @@ import {
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
-import { AdminGuard } from 'src/utils/admin.guard';
+// import { AdminGuard } from 'src/utils/admin.guard';
 import { ApiKeyGuard } from 'src/utils/api-key-auth';
 
 @Controller('internal')
@@ -240,9 +240,9 @@ export class InternalController {
     return { success: true, message: 'Buyer email resent' };
   }
 
-  @Post('email/participants/:orderId')
-  async resendParticipantEmails(@Param('orderId') orderId: string) {
-    await this.mailService.sendParticipantEmails(orderId);
-    return { success: true, message: 'Participant emails resent' };
-  }
+  // @Post('email/participants/:orderId')
+  // async resendParticipantEmails(@Param('orderId') orderId: string) {
+  //   await this.mailService.sendParticipantEmails(orderId);
+  //   return { success: true, message: 'Participant emails resent' };
+  // }
 }
