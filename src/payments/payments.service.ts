@@ -10,7 +10,7 @@ import { PaymentType } from '@prisma/client';
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
 
-  private readonly logger = new Logger(PaymentsService.name);
+  // private readonly logger = new Logger(PaymentsService.name);
 
   constructor(
     private prisma: PrismaService,
