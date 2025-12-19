@@ -6,7 +6,7 @@ import {
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { TicketsService } from '../tickets/tickets.service';
-import { ethereumUSDC } from '@daimo/pay-common';
+import { baseUSDC, ethereumUSDC } from '@daimo/pay-common';
 
 @Injectable()
 export class DaimoService {
@@ -23,7 +23,7 @@ export class DaimoService {
   /**
    * Create a Daimo payment order
    */
-  async createOrder(amount: number, currency = 'USDC') {
+  async createOrder(amount: number, currency = 'USD') {
     if (!this.DAIMO_API_KEY || !this.DESTINATION_ADDRESS) {
       throw new InternalServerErrorException('Missing Daimo configuration');
     }
@@ -33,12 +33,12 @@ export class DaimoService {
       const payload = {
         display: {
           intent: 'Checkout',
-          redirectUri: 'http://localhost:3000/conference/payment-success',
+          // redirectUri: 'http://localhost:3000/conference/payment-success',
         },
         destination: {
           destinationAddress: this.DESTINATION_ADDRESS,
-          chainId: ethereumUSDC.chainId, // EThereum mainnet
-          tokenAddress: ethereumUSDC.token, // USDC
+          chainId: baseUSDC.chainId, // Base mainnet
+          tokenAddress: baseUSDC.token, // USDC
           amountUnits: amount.toString(), // <-- FIXED: amount passed from argument
         },
         refundAddress: this.REFUND_ADDRESS,

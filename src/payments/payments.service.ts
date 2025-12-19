@@ -23,7 +23,8 @@ export class PaymentsService {
   // RAZORPAY ORDER
   // --------------------------------------------------
   async createRazorpayOrder(data: any) {
-    const { ticketType, buyer, participants, quantity, checkoutSessionId } = data;
+    const { ticketType, buyer, participants, quantity, checkoutSessionId } =
+      data;
 
     this.logger.log(
       `Creating Razorpay order | ticketType=${ticketType} | qty=${quantity}`,
@@ -55,10 +56,10 @@ export class PaymentsService {
       include: { participants: true },
     });
 
-
     if (existingOrder) {
       // Update existing order
-      const updatedRazorpayOrder = await this.razorpayService.createOrder(totalAmount);
+      const updatedRazorpayOrder =
+        await this.razorpayService.createOrder(totalAmount);
 
       this.logger.log(
         `Updating existing order | orderId=${existingOrder.id} | newRazorpayOrderId=${updatedRazorpayOrder.id}`,
@@ -169,7 +170,8 @@ export class PaymentsService {
   // DAIMO ORDER
   // --------------------------------------------------
   async createDaimoOrder(data: any) {
-    const { ticketType, buyer, participants, quantity, checkoutSessionId } = data;
+    const { ticketType, buyer, participants, quantity, checkoutSessionId } =
+      data;
 
     this.logger.log(
       `Creating Daimo order | ticketType=${ticketType} | qty=${quantity}`,
@@ -198,10 +200,10 @@ export class PaymentsService {
       include: { participants: true },
     });
 
-
     if (existingOrder) {
       // Update existing order
-      const updatedDaimoOrder = await this.daimoService.createOrder(totalAmount);
+      const updatedDaimoOrder =
+        await this.daimoService.createOrder(totalAmount);
 
       this.logger.log(
         `Updating existing Daimo order | orderId=${existingOrder.id} | newPaymentId=${updatedDaimoOrder.paymentId}`,
@@ -257,9 +259,7 @@ export class PaymentsService {
     // -------------------------------
     const daimoOrder = await this.daimoService.createOrder(totalAmount);
 
-    this.logger.log(
-      `Daimo order created | paymentId=${daimoOrder.paymentId}`,
-    );
+    this.logger.log(`Daimo order created | paymentId=${daimoOrder.paymentId}`);
 
     const order = await this.prisma.order.create({
       data: {
@@ -284,7 +284,7 @@ export class PaymentsService {
           },
         },
         amount: totalAmount,
-        currency: 'USDC',
+        currency: 'USD',
         paymentType: PaymentType.DAIMO,
         participants: {
           create: participants.map((p) => ({
@@ -322,11 +322,7 @@ export class PaymentsService {
   }
 
   async verifySignature(body: any) {
-    const {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-    } = body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
 
     this.logger.log(
       `Verifying Razorpay signature | orderId=${razorpay_order_id}`,
