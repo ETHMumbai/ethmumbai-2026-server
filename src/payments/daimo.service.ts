@@ -33,7 +33,7 @@ export class DaimoService {
       const payload = {
         display: {
           intent: 'Checkout',
-          redirectUri: 'http://localhost:3000/conference/payment-success',
+          // redirectUri: 'http://localhost:3000/conference/payment-success',
         },
         destination: {
           destinationAddress: this.DESTINATION_ADDRESS,
