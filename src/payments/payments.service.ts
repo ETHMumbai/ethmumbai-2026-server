@@ -1,5 +1,4 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
-// import { generateTicketCode } from '../utils/ticket.utils';
 import { PrismaService } from '../prisma/prisma.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { RazorpayService } from './razorpay.service';
@@ -9,8 +8,6 @@ import { PaymentType } from '@prisma/client';
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
-
-  // private readonly logger = new Logger(PaymentsService.name);
 
   constructor(
     private prisma: PrismaService,
@@ -23,11 +20,11 @@ export class PaymentsService {
   // RAZORPAY ORDER
   // --------------------------------------------------
   async createRazorpayOrder(data: any) {
-    const { ticketType, buyer, participants, quantity, checkoutSessionId } =
+    const { ticketType, buyer, participants, quantity } =
       data;
 
     this.logger.log(
-      `Creating Razorpay order | ticketType=${ticketType} | qty=${quantity}`,
+      `[Razorpay] Creating order | ticketType=${ticketType} | qty=${quantity} `,
     );
 
     const ticket = await this.prisma.ticket.findFirst({
@@ -35,40 +32,48 @@ export class PaymentsService {
     });
 
     if (!ticket) {
-      this.logger.error(`Ticket not found | type=${ticketType}`);
+      this.logger.error(`[Razorpay] Ticket not found | type=${ticketType}`);
       throw new BadRequestException('Ticket not found');
     }
 
     const totalAmount = ticket.fiat * quantity;
+    this.logger.log(`[Razorpay] Total amount calculated: ₹${totalAmount}`);
 
-    this.logger.log(
-      `Calculated Razorpay amount: ₹${totalAmount} (${ticket.fiat} × ${quantity})`,
-    );
+    const buyerEmail =
+      participants.find((p) => p.isBuyer)?.email || buyer.email;
 
-    // -------------------------------
-    // Check for existing Order
-    // -------------------------------
-    const existingOrder = await this.prisma.order.findFirst({
-      where: {
-        checkoutSessionId,
-        paymentVerified: false,
-      },
-      include: { participants: true },
+    if (!buyerEmail) {
+      this.logger.error('[Razorpay] Buyer email not found');
+      throw new BadRequestException('Buyer email not found');
+    }
+
+    this.logger.log(`[Razorpay] Checking for existing participant | email=${buyerEmail}`);
+    const existingParticipant = await this.prisma.participant.findUnique({
+      where: { email: buyerEmail },
+      include: { order: true },
     });
 
-    if (existingOrder) {
-      // Update existing order
-      const updatedRazorpayOrder =
-        await this.razorpayService.createOrder(totalAmount);
-
+    if (existingParticipant) {
+      const order = existingParticipant.order;
       this.logger.log(
-        `Updating existing order | orderId=${existingOrder.id} | newRazorpayOrderId=${updatedRazorpayOrder.id}`,
+        `[Razorpay] Existing participant found | participantId=${existingParticipant.id} | orderId=${order.id}`,
       );
 
+      if (order.paymentVerified) {
+        this.logger.warn(`[Razorpay] Payment already verified for this email`);
+        throw new BadRequestException(
+          'This email has already been used to purchase a ticket',
+        );
+      }
+
+      this.logger.log(`[Razorpay] Creating new Razorpay order for existing unpaid order`);
+      const razorpayOrder = await this.razorpayService.createOrder(totalAmount);
+
+      this.logger.log(`[Razorpay] Updating existing order | orderId=${order.id} | razorpayOrderId=${razorpayOrder.id}`);
       const updatedOrder = await this.prisma.order.update({
-        where: { id: existingOrder.id },
+        where: { id: order.id },
         data: {
-          razorpayOrderId: updatedRazorpayOrder.id,
+          razorpayOrderId: razorpayOrder.id,
           amount: totalAmount,
           ticket: { connect: { id: ticket.id } },
           buyer: {
@@ -89,7 +94,7 @@ export class PaymentsService {
             },
           },
           participants: {
-            deleteMany: {}, // remove old participants
+            deleteMany: {},
             create: participants.map((p) => ({
               firstName: p.firstName,
               lastName: p.lastName,
@@ -98,28 +103,24 @@ export class PaymentsService {
             })),
           },
         },
-        include: { participants: true },
       });
+
+      this.logger.log(`[Razorpay] Existing order updated successfully | orderId=${updatedOrder.id}`);
 
       return {
         success: true,
-        razorpayOrderId: updatedRazorpayOrder.id,
+        razorpayOrderId: razorpayOrder.id,
         amount: totalAmount,
         currency: 'INR',
         orderId: updatedOrder.id,
-        order: updatedOrder,
       };
     }
 
-    // -------------------------------
-    // No existing participant/order → create new order
-    // -------------------------------
+    this.logger.log(`[Razorpay] No existing participant found, creating new order`);
     const razorpayOrder = await this.razorpayService.createOrder(totalAmount);
 
-    // Save order in DB
     const order = await this.prisma.order.create({
       data: {
-        checkoutSessionId,
         razorpayOrderId: razorpayOrder.id,
         ticket: { connect: { id: ticket.id } },
         buyer: {
@@ -151,10 +152,9 @@ export class PaymentsService {
           })),
         },
       },
-      include: { participants: true },
     });
 
-    this.logger.log(`Order saved | orderId=${order.id}`);
+    this.logger.log(`[Razorpay] New order created successfully | orderId=${order.id}`);
 
     return {
       success: true,
@@ -162,7 +162,6 @@ export class PaymentsService {
       amount: totalAmount,
       currency: 'INR',
       orderId: order.id,
-      order,
     };
   }
 
@@ -170,50 +169,56 @@ export class PaymentsService {
   // DAIMO ORDER
   // --------------------------------------------------
   async createDaimoOrder(data: any) {
-    const { ticketType, buyer, participants, quantity, checkoutSessionId } =
-      data;
+    const { ticketType, buyer, participants, quantity } = data;
 
-    this.logger.log(
-      `Creating Daimo order | ticketType=${ticketType} | qty=${quantity}`,
-    );
+    this.logger.log(`[Daimo] Creating order | ticketType=${ticketType} | qty=${quantity}`);
 
     const ticket = await this.prisma.ticket.findFirst({
       where: { type: ticketType },
     });
-    if (!ticket) throw new BadRequestException('Ticket not found');
+    if (!ticket) {
+      this.logger.error('[Daimo] Ticket not found');
+      throw new BadRequestException('Ticket not found');
+    }
 
-    // calculate total amount
-    const totalAmount = ticket.crypto * quantity; //0.1
+    const totalAmount = ticket.crypto * quantity;
+    this.logger.log(`[Daimo] Total amount calculated: ${totalAmount} USDC`);
 
-    this.logger.log(
-      `Calculated Daimo amount: ${totalAmount} USDC (${ticket.crypto} × ${quantity})`,
-    );
+    const buyerEmail =
+      participants.find((p) => p.isBuyer)?.email || buyer.email;
 
-    // -------------------------------
-    // Check for existing Order
-    // -------------------------------
-    const existingOrder = await this.prisma.order.findFirst({
-      where: {
-        checkoutSessionId,
-        paymentVerified: false,
-      },
-      include: { participants: true },
+    if (!buyerEmail) {
+      this.logger.error('[Daimo] Buyer email not found');
+      throw new BadRequestException('Buyer email not found');
+    }
+
+    this.logger.log(`[Daimo] Checking for existing participant | email=${buyerEmail}`);
+    const existingParticipant = await this.prisma.participant.findUnique({
+      where: { email: buyerEmail },
+      include: { order: true },
     });
 
-    if (existingOrder) {
-      // Update existing order
-      const updatedDaimoOrder =
-        await this.daimoService.createOrder(totalAmount);
-
+    if (existingParticipant) {
+      const order = existingParticipant.order;
       this.logger.log(
-        `Updating existing Daimo order | orderId=${existingOrder.id} | newPaymentId=${updatedDaimoOrder.paymentId}`,
+        `[Daimo] Existing participant found | participantId=${existingParticipant.id} | orderId=${order.id}`,
       );
 
+      if (order.paymentVerified) {
+        this.logger.warn('[Daimo] Payment already verified for this email');
+        throw new BadRequestException(
+          'This email has already been used to purchase a ticket',
+        );
+      }
+
+      this.logger.log(`[Daimo] Creating new Daimo order for existing unpaid order`);
+      const daimoOrder = await this.daimoService.createOrder(totalAmount);
+
+      this.logger.log(`[Daimo] Updating existing order | orderId=${order.id} | daimoPaymentId=${daimoOrder.paymentId}`);
       const updatedOrder = await this.prisma.order.update({
-        where: { id: existingOrder.id },
+        where: { id: order.id },
         data: {
-          checkoutSessionId,
-          daimoPaymentId: updatedDaimoOrder.paymentId,
+          daimoPaymentId: daimoOrder.paymentId,
           amount: totalAmount,
           ticket: { connect: { id: ticket.id } },
           buyer: {
@@ -243,27 +248,24 @@ export class PaymentsService {
             })),
           },
         },
-        include: { participants: true },
       });
+
+      this.logger.log(`[Daimo] Existing order updated successfully | orderId=${updatedOrder.id}`);
 
       return {
         success: true,
-        paymentId: updatedDaimoOrder.paymentId,
+        paymentId: daimoOrder.paymentId,
         orderId: updatedOrder.id,
-        order: updatedOrder,
       };
     }
 
-    // -------------------------------
-    // No existing participant/order → create new order
-    // -------------------------------
+    this.logger.log('[Daimo] No existing participant found, creating new order');
     const daimoOrder = await this.daimoService.createOrder(totalAmount);
 
     this.logger.log(`Daimo order created | paymentId=${daimoOrder.paymentId}`);
 
     const order = await this.prisma.order.create({
       data: {
-        checkoutSessionId,
         daimoPaymentId: daimoOrder.paymentId,
         ticket: { connect: { id: ticket.id } },
         buyer: {
@@ -295,29 +297,25 @@ export class PaymentsService {
           })),
         },
       },
-      include: { participants: true },
     });
 
-    this.logger.log(`Order saved | orderId=${order.id}`);
+    this.logger.log(`[Daimo] New order created successfully | orderId=${order.id}`);
 
     return {
       success: true,
       paymentId: daimoOrder.paymentId,
       orderId: order.id,
-      order,
     };
   }
 
   // --------------------------------------------------
-  // VERIFY PAYMENT
+  // VERIFY PAYMENT (unchanged)
   // --------------------------------------------------
   async verifyPayment(body: any) {
-    this.logger.log(`Verifying payment | type=${body.paymentType}`);
-
+    this.logger.log(`[VerifyPayment] Verifying payment | type=${body.paymentType}`);
     if (body.paymentType === 'DAIMO') {
       return await this.daimoService.verifyPayment(body.paymentId);
     }
-
     return this.verifySignature(body);
   }
 
@@ -335,9 +333,7 @@ export class PaymentsService {
     );
 
     if (!verifyResult.success) {
-      this.logger.warn(
-        `Razorpay verification failed | orderId=${razorpay_order_id}`,
-      );
+      this.logger.warn(`[Razorpay] Signature verification failed | orderId=${razorpay_order_id}`);
       return verifyResult;
     }
 
@@ -346,9 +342,7 @@ export class PaymentsService {
     });
 
     if (!order) {
-      this.logger.error(
-        `Order not found after payment | razorpayOrderId=${razorpay_order_id}`,
-      );
+      this.logger.error(`[Razorpay] Order not found after payment | razorpayOrderId=${razorpay_order_id}`);
       throw new BadRequestException('Order not found');
     }
 
@@ -362,11 +356,8 @@ export class PaymentsService {
       },
     });
 
-    this.logger.log(
-      `Payment verified & order marked paid | orderId=${order.id}`,
-    );
-
-    this.logger.log(`Generating tickets | orderId=${order.id}`);
+    this.logger.log(`[Razorpay] Payment verified & order marked paid | orderId=${order.id}`);
+    this.logger.log(`[Tickets] Generating tickets | orderId=${order.id}`);
     await this.ticketsService.generateTicketsForOrder(order.id);
 
     return verifyResult;

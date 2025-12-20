@@ -16,6 +16,8 @@ async function bootstrap() {
       'x-api-key',
     ],
     credentials: true, // set true only if you use cookies/auth headers
+    preflightContinue: false,
+  optionsSuccessStatus: 204,
   });
   console.log('DATABASE_URL at startup:', process.env.DATABASE_URL);
 
