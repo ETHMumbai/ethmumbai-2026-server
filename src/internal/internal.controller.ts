@@ -277,7 +277,7 @@ export class InternalController {
         paymentMethod:
           order.paymentType === 'RAZORPAY'
             ? 'Credit/Debit Card'
-            : 'Crypto (USDC)',
+            : 'Crypto',
         purchaseDate: order.createdAt,
         totalAmount: order.amount,
         currency: order.currency,
