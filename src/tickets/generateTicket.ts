@@ -18,39 +18,37 @@ export function generateTicketPDF(data: TicketData): InstanceType<typeof PDFDocu
 
   const fontRegular = path.join(
     __dirname,
-    "../assets/fonts/MPLUSRounded1c-Light.ttf"
+    "../assets/fonts/InterTight-Regular.ttf"
   );
-  const fontBold = path.join(
+    const fontBold = path.join(
+      __dirname,
+      "../assets/fonts/InterTight-Bold.ttf"
+    );
+
+    const fontMplus = path.join(
     __dirname,
     "../assets/fonts/MPLUSRounded1c-Black.ttf"
   );
 
+
   doc.registerFont("Regular", fontRegular);
   doc.registerFont("Bold", fontBold);
+  doc.registerFont("MPlus", fontMplus);
 
   // Background
   doc.rect(0, 0, pageWidth, doc.page.height).fill("#FFFFFF");
 
-  // Header pill
-  const pillWidth = 220;
-  const pillHeight = 48;
-  const pillX = (pageWidth - pillWidth) / 2;
-  const pillY = 40;
-
-  doc.roundedRect(pillX, pillY, pillWidth, pillHeight, 24).fill("#E23B2E");
+  const logoSize = 160;
+  const logoX = (pageWidth - logoSize) / 2;
+  const logoY = 40;
 
   const logoPath = path.join(__dirname, "../assets/ethmumbai-logo.png");
-  doc.image(logoPath, pillX + 16, pillY + 10, { width: 28 });
+  doc.image(logoPath, logoX, logoY, { width: logoSize });
 
-  doc
-    .font("Bold")
-    .fontSize(18)
-    .fillColor("#FFFFFF")
-    .text("ETHMUMBAI", pillX + 52, pillY + 14);
 
   // Hey {name}
   doc
-    .font("Bold")
+    .font("MPlus")
     .fontSize(30)
     .fillColor("#000000")
     .text(`Hey ${data.name}`, 0, 120, { align: "center" });

@@ -103,7 +103,7 @@ export class TicketsService {
     const qrHash = crypto.createHash('sha256').update(ticketCode).digest('hex');
 
     const ticketUrl = `${
-      process.env.APP_BASE_URL || 'http://localhost:3000'
+      process.env.APP_BASE_URL || 'https://www.ethmumbai.in'
     }/t/${ticketCode}`;
 
     return { ticketUrl, qrHash };
@@ -151,5 +151,24 @@ export class TicketsService {
         buyerName: orderInfo?.buyer.firstName || 'Buyer',
       };
     }
+  }
+
+  async getTicketCount() {
+    // Total earlybird tickets available
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { type: 'earlybird' },
+      select: { quantity: true },
+    });
+
+    if (!ticket) {
+      return { ticketCount: 0 };
+    }
+
+    // Tickets already generated / sold (ONLY earlybird)
+    const usedCount = await this.prisma.generatedTicket.count();
+
+    return {
+      ticketCount: Math.max(ticket.quantity - usedCount, 0),
+    };
   }
 }
