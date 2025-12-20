@@ -19,7 +19,6 @@ model Ticket {
 
 model Order {
   id                String            @id @default(uuid())
-  checkoutSessionId String            @unique
   razorpayOrderId   String?           @unique
   razorpayPaymentId String?           @unique
   daimoPaymentId    String?           @unique
