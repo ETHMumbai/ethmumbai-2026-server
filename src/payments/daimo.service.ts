@@ -32,7 +32,7 @@ export class DaimoService {
       // Daimo expects amount in string, and USDC token address on Base (mainnet)
       const payload = {
         display: {
-          // intent: 'Checkout',
+          intent: 'Checkout',
           // redirectUri: 'http://localhost:3000/conference/payment-success',
         },
         destination: {
