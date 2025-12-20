@@ -246,6 +246,25 @@ export class InternalController {
   //   return { success: true, message: 'Participant emails resent' };
   // }
 
+  @Get('check-email')
+  async checkEmail(@Query('email') email: string) {
+    if (!email) {
+      throw new BadRequestException('Email is required');
+    }
+
+    const participant = await this.prisma.participant.findFirst({
+      where: {
+        email: email,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (participant) return { exists: true };
+    return { exists: false };
+  }
+
   //success endpoint for order success page
   @Get('orders/success/:orderId')
   async getOrderForSuccessPage(@Param('orderId') orderId: string) {
@@ -275,9 +294,7 @@ export class InternalController {
         ticketType: order.ticket.title,
         quantity: order.participants.length,
         paymentMethod:
-          order.paymentType === 'RAZORPAY'
-            ? 'Credit/Debit Card'
-            : 'Crypto',
+          order.paymentType === 'RAZORPAY' ? 'Credit/Debit Card' : 'Crypto',
         purchaseDate: order.createdAt,
         totalAmount: order.amount,
         currency: order.currency,
