@@ -262,6 +262,8 @@ export class PaymentsService {
     this.logger.log('[Daimo] No existing participant found, creating new order');
     const daimoOrder = await this.daimoService.createOrder(totalAmount);
 
+    this.logger.log(`Daimo order created | paymentId=${daimoOrder.paymentId}`);
+
     const order = await this.prisma.order.create({
       data: {
         daimoPaymentId: daimoOrder.paymentId,
@@ -319,7 +321,10 @@ export class PaymentsService {
 
   async verifySignature(body: any) {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
-    this.logger.log(`[Razorpay] Verifying signature | orderId=${razorpay_order_id}`);
+
+    this.logger.log(
+      `Verifying Razorpay signature | orderId=${razorpay_order_id}`,
+    );
 
     const verifyResult = await this.razorpayService.verifySignature(
       razorpay_order_id,
