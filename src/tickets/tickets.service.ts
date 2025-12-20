@@ -152,4 +152,23 @@ export class TicketsService {
       };
     }
   }
+
+  async getTicketCount() {
+    // Total earlybird tickets available
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { type: 'earlybird' },
+      select: { quantity: true },
+    });
+
+    if (!ticket) {
+      return { ticketCount: 0 };
+    }
+
+    // Tickets already generated / sold (ONLY earlybird)
+    const usedCount = await this.prisma.generatedTicket.count();
+
+    return {
+      ticketCount: Math.max(ticket.quantity - usedCount, 0),
+    };
+  }
 }

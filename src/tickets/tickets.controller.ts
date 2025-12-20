@@ -68,4 +68,9 @@ export class TicketsController {
 
     pdfDoc.pipe(res);
   }
+
+  @Get('/ticketCount')
+  async getTicketCount() {
+    return await this.ticketService.getTicketCount();
+  }
 }
