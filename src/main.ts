@@ -7,7 +7,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://localhost:3000','https://www.ethmumbai.in'], // your Vite dev server
+    origin: ['http://localhost:5173', 'http://localhost:3000','https://www.ethmumbai.in', 'https://ethmumbai-2026-dec-ui-git-earlybird-ethmumbais-projects.vercel.app' ], // your Vite dev server
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
