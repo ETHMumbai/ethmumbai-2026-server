@@ -6,12 +6,14 @@ import {
   UseGuards,
   BadRequestException,
   Query,
+  Body,
 } from '@nestjs/common';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 // import { AdminGuard } from 'src/utils/admin.guard';
 import { ApiKeyGuard } from 'src/utils/api-key-auth';
+import { TicketsService } from 'src/tickets/tickets.service';
 
 @Controller('internal')
 // @UseGuards(AdminGuard)
@@ -22,6 +24,7 @@ export class InternalController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly ticketsService: TicketsService,
   ) {}
 
   // --- Participants ---
@@ -294,9 +297,7 @@ export class InternalController {
         ticketType: order.ticket.title,
         quantity: order.participants.length,
         paymentMethod:
-          order.paymentType === 'RAZORPAY'
-            ? 'Credit/Debit Card'
-            : 'Crypto',
+          order.paymentType === 'RAZORPAY' ? 'Credit/Debit Card' : 'Crypto',
         purchaseDate: order.createdAt,
         totalAmount: order.amount,
         currency: order.currency,
@@ -309,5 +310,95 @@ export class InternalController {
         })),
       },
     };
+  }
+
+  //endpoint to send free tickets
+  @Post('sendTickets')
+  async sendTickets(
+    @Body() body: { firstName: string; lastName: string; email: string }[],
+  ) {
+    // const { firstName, lastName, email } = body;
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { type: 'earlybird' },
+    });
+    if (!ticket) {
+      throw new BadRequestException('Ticket not found');
+    }
+    for (const { firstName, lastName, email } of body) {
+      const existingParticipant = await this.prisma.participant.findUnique({
+        where: { email: email },
+        include: { order: true, generatedTicket: true },
+      });
+
+      if (existingParticipant) {
+        console.log('Participant already exists:', existingParticipant.email);
+        // if (existingParticipant.generatedTicket?.ticketCode == null) {
+        //   console.log(
+        //     'Participant exists but ticket not generated. Generating...for:',
+        //     existingParticipant.email,
+        //   );
+        //   await this.ticketsService.generateTicketsForOrder(
+        //     existingParticipant.order.id,
+        //   );
+        // } else {
+        //   console.log(
+        //     '✅ Ticket already generated for participant:',
+        //     existingParticipant.email,
+        //   );
+        // }
+      }
+
+      //create order with buyer details - null + participant
+      if (!existingParticipant) {
+        const order = await this.prisma.order.create({
+          data: {
+            daimoPaymentId: null,
+            ticket: { connect: { id: ticket.id } },
+            buyer: {
+              create: {
+                firstName: firstName,
+                lastName: lastName ?? null,
+                email: '',
+                address: {
+                  create: {
+                    line1: '',
+                    line2: null,
+                    city: '',
+                    state: '',
+                    country: '',
+                    postalCode: '',
+                  },
+                },
+              },
+            },
+            amount: 0,
+            currency: 'DAIMO',
+            paymentType: null,
+            participants: {
+              create: {
+                firstName: firstName,
+                lastName: lastName,
+                email: email,
+                isBuyer: false,
+              },
+            },
+          },
+        });
+
+        const createdOrder = await this.prisma.order.findUnique({
+          where: { id: order.id },
+          include: { participants: true },
+        });
+
+        //generate ticket
+        if (createdOrder) {
+          await this.ticketsService.generateTicketsForOrder(createdOrder.id);
+          console.log(
+            '✅ Ticket generated for order:',
+            createdOrder.participants,
+          );
+        }
+      }
+    }
   }
 }
