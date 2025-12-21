@@ -318,12 +318,12 @@ export class InternalController {
     @Body() body: { firstName: string; lastName: string; email: string }[],
   ) {
     // const { firstName, lastName, email } = body;
-    const ticket = await this.prisma.ticket.findFirst({
-      where: { type: 'earlybird' },
-    });
-    if (!ticket) {
-      throw new BadRequestException('Ticket not found');
-    }
+    // const ticket = await this.prisma.ticket.findFirst({
+    //   where: { type: 'earlybird' },
+    // });
+    // if (!ticket) {
+    //   throw new BadRequestException('Ticket not found');
+    // }
     for (const { firstName, lastName, email } of body) {
       const existingParticipant = await this.prisma.participant.findUnique({
         where: { email: email },
@@ -353,7 +353,7 @@ export class InternalController {
         const order = await this.prisma.order.create({
           data: {
             daimoPaymentId: null,
-            ticket: { connect: { id: ticket.id } },
+            ticket: {},
             buyer: {
               create: {
                 firstName: firstName,
