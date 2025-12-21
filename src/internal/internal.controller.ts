@@ -312,6 +312,7 @@ export class InternalController {
     };
   }
 
+  //endpoint to send free tickets
   @Post('sendTickets')
   async sendTickets(
     @Body() body: { firstName: string; lastName: string; email: string }[],
@@ -353,7 +354,7 @@ export class InternalController {
               create: {
                 firstName: firstName,
                 lastName: lastName ?? null,
-                email: email,
+                email: '',
                 address: {
                   create: {
                     line1: '',
@@ -367,7 +368,7 @@ export class InternalController {
               },
             },
             amount: 0,
-            currency: '',
+            currency: 'DAIMO',
             paymentType: null,
             participants: {
               create: {
