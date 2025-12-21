@@ -326,11 +326,21 @@ export class InternalController {
 
     const existingParticipant = await this.prisma.participant.findUnique({
       where: { email: email },
-      include: { order: true },
+      include: { order: true, generatedTicket: true },
     });
 
     if (existingParticipant) {
-      console.log('ℹ️ Participant already exists:', existingParticipant.email);
+      console.log('Participant already exists:', existingParticipant.email);
+      if (!existingParticipant.generatedTicket) {
+        await this.ticketsService.generateTicketsForOrder(
+          existingParticipant.order.id,
+        );
+      } else {
+        console.log(
+          '✅ Ticket already generated for participant:',
+          existingParticipant.email,
+        );
+      }
       return;
     }
 
