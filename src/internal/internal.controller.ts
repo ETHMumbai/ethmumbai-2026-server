@@ -332,20 +332,20 @@ export class InternalController {
 
       if (existingParticipant) {
         console.log('Participant already exists:', existingParticipant.email);
-        if (existingParticipant.generatedTicket?.ticketCode == null) {
-          console.log(
-            'Participant exists but ticket not generated. Generating...for:',
-            existingParticipant.email,
-          );
-          await this.ticketsService.generateTicketsForOrder(
-            existingParticipant.order.id,
-          );
-        } else {
-          console.log(
-            '✅ Ticket already generated for participant:',
-            existingParticipant.email,
-          );
-        }
+        // if (existingParticipant.generatedTicket?.ticketCode == null) {
+        //   console.log(
+        //     'Participant exists but ticket not generated. Generating...for:',
+        //     existingParticipant.email,
+        //   );
+        //   await this.ticketsService.generateTicketsForOrder(
+        //     existingParticipant.order.id,
+        //   );
+        // } else {
+        //   console.log(
+        //     '✅ Ticket already generated for participant:',
+        //     existingParticipant.email,
+        //   );
+        // }
       }
 
       //create order with buyer details - null + participant
