@@ -96,7 +96,7 @@ export class TicketsService {
     await this.mailService.sendParticipantEmails(orderId, pdfMap);
 
     // SEND BUYER CONFIRMATION
-    await this.mailService.sendBuyerEmail(orderId);
+    // await this.mailService.sendBuyerEmail(orderId);
   }
 
   async generateQRforTicket(ticketCode: string) {
