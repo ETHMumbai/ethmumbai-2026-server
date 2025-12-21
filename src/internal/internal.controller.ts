@@ -330,9 +330,8 @@ export class InternalController {
     });
 
     if (existingParticipant) {
-      const existingOrder = existingParticipant.order;
-      await this.ticketsService.generateTicketsForOrder(existingOrder.id);
-      console.log('✅ Ticket generated for order:', existingOrder.id);
+      console.log('ℹ️ Participant already exists:', existingParticipant.email);
+      return;
     }
 
     //create order with buyer details - null + participant
