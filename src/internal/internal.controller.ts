@@ -314,81 +314,86 @@ export class InternalController {
 
   @Post('sendTickets')
   async sendTickets(
-    @Body() body: { firstName: string; lastName: string; email: string },
+    @Body() body: { firstName: string; lastName: string; email: string }[],
   ) {
-    const { firstName, lastName, email } = body;
+    // const { firstName, lastName, email } = body;
     const ticket = await this.prisma.ticket.findFirst({
       where: { type: 'earlybird' },
     });
     if (!ticket) {
       throw new BadRequestException('Ticket not found');
     }
+    for (const { firstName, lastName, email } of body) {
+      const existingParticipant = await this.prisma.participant.findUnique({
+        where: { email: email },
+        include: { order: true, generatedTicket: true },
+      });
 
-    const existingParticipant = await this.prisma.participant.findUnique({
-      where: { email: email },
-      include: { order: true, generatedTicket: true },
-    });
-
-    if (existingParticipant) {
-      console.log('Participant already exists:', existingParticipant.email);
-      if (!existingParticipant.generatedTicket) {
-        await this.ticketsService.generateTicketsForOrder(
-          existingParticipant.order.id,
-        );
-      } else {
-        console.log(
-          '✅ Ticket already generated for participant:',
-          existingParticipant.email,
-        );
+      if (existingParticipant) {
+        console.log('Participant already exists:', existingParticipant.email);
+        if (!existingParticipant.generatedTicket) {
+          await this.ticketsService.generateTicketsForOrder(
+            existingParticipant.order.id,
+          );
+        } else {
+          console.log(
+            '✅ Ticket already generated for participant:',
+            existingParticipant.email,
+          );
+        }
       }
-      return;
-    }
 
-    //create order with buyer details - null + participant
-    const order = await this.prisma.order.create({
-      data: {
-        daimoPaymentId: null,
-        ticket: { connect: { id: ticket.id } },
-        buyer: {
-          create: {
-            firstName: firstName,
-            lastName: lastName ?? null,
-            email: email,
-            address: {
+      //create order with buyer details - null + participant
+      if (!existingParticipant) {
+        const order = await this.prisma.order.create({
+          data: {
+            daimoPaymentId: null,
+            ticket: { connect: { id: ticket.id } },
+            buyer: {
               create: {
-                line1: '',
-                line2: null,
-                city: '',
-                state: '',
-                country: '',
-                postalCode: '',
+                firstName: firstName,
+                lastName: lastName ?? null,
+                email: email,
+                address: {
+                  create: {
+                    line1: '',
+                    line2: null,
+                    city: '',
+                    state: '',
+                    country: '',
+                    postalCode: '',
+                  },
+                },
+              },
+            },
+            amount: 0,
+            currency: '',
+            paymentType: null,
+            participants: {
+              create: {
+                firstName: firstName,
+                lastName: lastName,
+                email: email,
+                isBuyer: false,
               },
             },
           },
-        },
-        amount: 0,
-        currency: '',
-        paymentType: null,
-        participants: {
-          create: {
-            firstName: firstName,
-            lastName: lastName,
-            email: email,
-            isBuyer: false,
-          },
-        },
-      },
-    });
+        });
 
-    const createdOrder = await this.prisma.order.findUnique({
-      where: { id: order.id },
-      include: { participants: true },
-    });
+        const createdOrder = await this.prisma.order.findUnique({
+          where: { id: order.id },
+          include: { participants: true },
+        });
 
-    //generate ticket
-    if (createdOrder) {
-      await this.ticketsService.generateTicketsForOrder(createdOrder.id);
-      console.log('✅ Ticket generated for order:', createdOrder.participants);
+        //generate ticket
+        if (createdOrder) {
+          await this.ticketsService.generateTicketsForOrder(createdOrder.id);
+          console.log(
+            '✅ Ticket generated for order:',
+            createdOrder.participants,
+          );
+        }
+      }
     }
   }
 }
