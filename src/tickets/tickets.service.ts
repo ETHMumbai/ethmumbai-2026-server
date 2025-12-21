@@ -165,10 +165,12 @@ export class TicketsService {
     }
 
     // Tickets already generated / sold (ONLY earlybird)
-    const usedCount = await this.prisma.generatedTicket.count();
+    const usedCount = await this.prisma.generatedTicket.findMany({
+      where: { order: { ticket: { type: 'earlybird' } } },
+    });
 
     return {
-      ticketCount: Math.max(ticket.quantity - usedCount, 0),
+      ticketCount: Math.max(ticket.quantity - usedCount.length, 0),
     };
   }
 }
