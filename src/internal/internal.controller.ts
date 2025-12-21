@@ -319,7 +319,7 @@ export class InternalController {
   ) {
     // const { firstName, lastName, email } = body;
     const ticket = await this.prisma.ticket.findFirst({
-      where: { type: 'earlybird' },
+      where: { type: 'standard' },
     });
     if (!ticket) {
       throw new BadRequestException('Ticket not found');
