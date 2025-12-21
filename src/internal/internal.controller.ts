@@ -332,7 +332,7 @@ export class InternalController {
 
       if (existingParticipant) {
         console.log('Participant already exists:', existingParticipant.email);
-        if (existingParticipant.generatedTicket == null) {
+        if (existingParticipant.generatedTicket?.ticketCode == null) {
           console.log(
             'Participant exists but ticket not generated. Generating...for:',
             existingParticipant.email,
