@@ -332,7 +332,7 @@ export class InternalController {
 
       if (existingParticipant) {
         console.log('Participant already exists:', existingParticipant.email);
-        if (!existingParticipant.generatedTicket) {
+        if (existingParticipant.generatedTicket == null) {
           await this.ticketsService.generateTicketsForOrder(
             existingParticipant.order.id,
           );
