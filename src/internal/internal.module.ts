@@ -3,9 +3,10 @@ import { InternalController } from './internal.controller';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { LoopsService } from 'src/mail/loops.service';
+import { TicketsService } from 'src/tickets/tickets.service';
 
 @Module({
   controllers: [InternalController],
-  providers: [PrismaService, MailService, LoopsService],
+  providers: [PrismaService, MailService, LoopsService, TicketsService],
 })
 export class InternalModule {}
