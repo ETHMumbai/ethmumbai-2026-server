@@ -358,7 +358,7 @@ export class InternalController {
               create: {
                 firstName: firstName,
                 lastName: lastName ?? null,
-                email: '',
+                email: 'test@test.com',
                 address: {
                   create: {
                     line1: '',
@@ -372,7 +372,7 @@ export class InternalController {
               },
             },
             amount: 0,
-            currency: 'DAIMO',
+            currency: 'USD',
             paymentType: null,
             participants: {
               create: {
