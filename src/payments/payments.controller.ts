@@ -23,4 +23,10 @@ export class PaymentsController {
   async verifyPayment(@Body() body: any) {
     return await this.paymentsService.verifyPayment(body);
   }
+
+  @Post('daimo/webhook')
+  async daimoWebhook(@Body() body: any) {
+    // return await this.paymentsService.handleDaimoWebhook(body);
+    return 'webhook received : ' + { body };
+  }
 }
