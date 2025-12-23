@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  HttpCode,
-  Post,
-  Headers,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Body, Controller, Post } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 
 @Controller('payments')
@@ -32,39 +25,22 @@ export class PaymentsController {
   }
 
   @Post('daimo/webhook')
-  @HttpCode(200)
-  async daimoWebhook(
-    @Body() body: any,
-    @Headers('authorization') authorization?: string,
-  ) {
-    // Verify webhook token
-    if (!authorization || authorization !== process.env.DAIMO_WEBHOOK_TOKEN) {
-      throw new UnauthorizedException('Invalid webhook token');
+  async daimoWebhook(@Body() body: any) {
+    console.log('🔔 Daimo Event:', body.event);
+
+    switch (body.event) {
+      case 'payment.succeeded':
+        console.log('✅ Payment success:', body.data);
+        break;
+
+      case 'payment.failed':
+        console.log('❌ Payment failed:', body.data);
+        break;
+
+      default:
+        console.log('⚠️ Unknown event:', body);
     }
 
-    await this.paymentsService.paymentEventHandler(body);
-
-    // Return success immediately
     return { received: true };
-
-    // console.log('🔔 Daimo Event:', body.type);
-    //for payment Started -> create order with payId
-    // for payment completed -> verify payment + update order status, daimo txn hash
-    //for payment_bounced-> update order status to pending
-    //for payment_refunded -> update order status to refunded (failed payment ui with data - )
-    // switch (body.event) {
-    //   case 'payment.succeeded':
-    //     console.log('✅ Payment success:', body.data);
-    //     break;
-
-    //   case 'payment.failed':
-    //     console.log('❌ Payment failed:', body.data);
-    //     break;
-
-    //   default:
-    //     console.log('⚠️ Unknown event:', body);
-    // }
-
-    // return { received: true };
   }
 }
