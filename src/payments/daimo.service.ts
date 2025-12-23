@@ -79,13 +79,13 @@ export class DaimoService {
     switch (eventBody.data.type) {
       case 'payment_started':
         console.log('🟡 Payment started:', eventBody.data);
-        await this.verifyPayment(eventBody, eventBody.data.paymentId);
+        // await this.verifyPayment(eventBody, eventBody.data.paymentId);
         break;
 
       case 'payment_completed':
         console.log('✅ Payment completed:', eventBody.data);
         // update order → generate tickets → send emails
-        await this.verifyPayment(eventBody, eventBody.data.paymentId);
+        // await this.verifyPayment(eventBody, eventBody.data.paymentId);
         break;
 
       case 'payment_bounced':
