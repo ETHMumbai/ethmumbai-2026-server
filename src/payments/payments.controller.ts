@@ -26,21 +26,7 @@ export class PaymentsController {
 
   @Post('daimo/webhook')
   async daimoWebhook(@Body() body: any) {
-    console.log('🔔 Daimo Event:', body.event);
-
-    switch (body.event) {
-      case 'payment.succeeded':
-        console.log('✅ Payment success:', body.data);
-        break;
-
-      case 'payment.failed':
-        console.log('❌ Payment failed:', body.data);
-        break;
-
-      default:
-        console.log('⚠️ Unknown event:', body);
-    }
-
-    return { received: true };
+    // return await this.paymentsService.handleDaimoWebhook(body);
+    return 'webhook received : ' + { body };
   }
 }
