@@ -20,7 +20,8 @@ export class PaymentsService {
   // RAZORPAY ORDER
   // --------------------------------------------------
   async createRazorpayOrder(data: any) {
-    const { ticketType, buyer, participants, quantity } = data;
+    const { ticketType, buyer, participants, quantity } =
+      data;
 
     this.logger.log(
       `[Razorpay] Creating order | ticketType=${ticketType} | qty=${quantity} `,
@@ -46,9 +47,7 @@ export class PaymentsService {
       throw new BadRequestException('Buyer email not found');
     }
 
-    this.logger.log(
-      `[Razorpay] Checking for existing participant | email=${buyerEmail}`,
-    );
+    this.logger.log(`[Razorpay] Checking for existing participant | email=${buyerEmail}`);
     const existingParticipant = await this.prisma.participant.findUnique({
       where: { email: buyerEmail },
       include: { order: true },
@@ -67,14 +66,10 @@ export class PaymentsService {
         );
       }
 
-      this.logger.log(
-        `[Razorpay] Creating new Razorpay order for existing unpaid order`,
-      );
+      this.logger.log(`[Razorpay] Creating new Razorpay order for existing unpaid order`);
       const razorpayOrder = await this.razorpayService.createOrder(totalAmount);
 
-      this.logger.log(
-        `[Razorpay] Updating existing order | orderId=${order.id} | razorpayOrderId=${razorpayOrder.id}`,
-      );
+      this.logger.log(`[Razorpay] Updating existing order | orderId=${order.id} | razorpayOrderId=${razorpayOrder.id}`);
       const updatedOrder = await this.prisma.order.update({
         where: { id: order.id },
         data: {
@@ -110,9 +105,7 @@ export class PaymentsService {
         },
       });
 
-      this.logger.log(
-        `[Razorpay] Existing order updated successfully | orderId=${updatedOrder.id}`,
-      );
+      this.logger.log(`[Razorpay] Existing order updated successfully | orderId=${updatedOrder.id}`);
 
       return {
         success: true,
@@ -123,9 +116,7 @@ export class PaymentsService {
       };
     }
 
-    this.logger.log(
-      `[Razorpay] No existing participant found, creating new order`,
-    );
+    this.logger.log(`[Razorpay] No existing participant found, creating new order`);
     const razorpayOrder = await this.razorpayService.createOrder(totalAmount);
 
     const order = await this.prisma.order.create({
@@ -163,9 +154,7 @@ export class PaymentsService {
       },
     });
 
-    this.logger.log(
-      `[Razorpay] New order created successfully | orderId=${order.id}`,
-    );
+    this.logger.log(`[Razorpay] New order created successfully | orderId=${order.id}`);
 
     return {
       success: true,
@@ -182,9 +171,7 @@ export class PaymentsService {
   async createDaimoOrder(data: any) {
     const { ticketType, buyer, participants, quantity } = data;
 
-    this.logger.log(
-      `[Daimo] Creating order | ticketType=${ticketType} | qty=${quantity}`,
-    );
+    this.logger.log(`[Daimo] Creating order | ticketType=${ticketType} | qty=${quantity}`);
 
     const ticket = await this.prisma.ticket.findFirst({
       where: { type: ticketType },
@@ -205,9 +192,7 @@ export class PaymentsService {
       throw new BadRequestException('Buyer email not found');
     }
 
-    this.logger.log(
-      `[Daimo] Checking for existing participant | email=${buyerEmail}`,
-    );
+    this.logger.log(`[Daimo] Checking for existing participant | email=${buyerEmail}`);
     const existingParticipant = await this.prisma.participant.findUnique({
       where: { email: buyerEmail },
       include: { order: true },
@@ -226,14 +211,10 @@ export class PaymentsService {
         );
       }
 
-      this.logger.log(
-        `[Daimo] Creating new Daimo order for existing unpaid order`,
-      );
+      this.logger.log(`[Daimo] Creating new Daimo order for existing unpaid order`);
       const daimoOrder = await this.daimoService.createOrder(totalAmount);
 
-      this.logger.log(
-        `[Daimo] Updating existing order | orderId=${order.id} | daimoPaymentId=${daimoOrder.paymentId}`,
-      );
+      this.logger.log(`[Daimo] Updating existing order | orderId=${order.id} | daimoPaymentId=${daimoOrder.paymentId}`);
       const updatedOrder = await this.prisma.order.update({
         where: { id: order.id },
         data: {
@@ -269,9 +250,7 @@ export class PaymentsService {
         },
       });
 
-      this.logger.log(
-        `[Daimo] Existing order updated successfully | orderId=${updatedOrder.id}`,
-      );
+      this.logger.log(`[Daimo] Existing order updated successfully | orderId=${updatedOrder.id}`);
 
       return {
         success: true,
@@ -280,9 +259,7 @@ export class PaymentsService {
       };
     }
 
-    this.logger.log(
-      '[Daimo] No existing participant found, creating new order',
-    );
+    this.logger.log('[Daimo] No existing participant found, creating new order');
     const daimoOrder = await this.daimoService.createOrder(totalAmount);
 
     this.logger.log(`Daimo order created | paymentId=${daimoOrder.paymentId}`);
@@ -322,9 +299,7 @@ export class PaymentsService {
       },
     });
 
-    this.logger.log(
-      `[Daimo] New order created successfully | orderId=${order.id}`,
-    );
+    this.logger.log(`[Daimo] New order created successfully | orderId=${order.id}`);
 
     return {
       success: true,
@@ -333,20 +308,14 @@ export class PaymentsService {
     };
   }
 
-  async paymentEventHandler(eventBody: any) {
-    return await this.daimoService.daimoWebhookHandler(eventBody);
-  }
-
   // --------------------------------------------------
   // VERIFY PAYMENT (unchanged)
   // --------------------------------------------------
   async verifyPayment(body: any) {
-    this.logger.log(
-      `[VerifyPayment] Verifying payment | type=${body.paymentType}`,
-    );
-    // if (body.paymentType === 'DAIMO') {
-    //   return await this.daimoService.verifyPayment(body.paymentId);
-    // }
+    this.logger.log(`[VerifyPayment] Verifying payment | type=${body.paymentType}`);
+    if (body.paymentType === 'DAIMO') {
+      return await this.daimoService.verifyPayment(body.paymentId);
+    }
     return this.verifySignature(body);
   }
 
@@ -364,9 +333,7 @@ export class PaymentsService {
     );
 
     if (!verifyResult.success) {
-      this.logger.warn(
-        `[Razorpay] Signature verification failed | orderId=${razorpay_order_id}`,
-      );
+      this.logger.warn(`[Razorpay] Signature verification failed | orderId=${razorpay_order_id}`);
       return verifyResult;
     }
 
@@ -375,9 +342,7 @@ export class PaymentsService {
     });
 
     if (!order) {
-      this.logger.error(
-        `[Razorpay] Order not found after payment | razorpayOrderId=${razorpay_order_id}`,
-      );
+      this.logger.error(`[Razorpay] Order not found after payment | razorpayOrderId=${razorpay_order_id}`);
       throw new BadRequestException('Order not found');
     }
 
@@ -391,9 +356,7 @@ export class PaymentsService {
       },
     });
 
-    this.logger.log(
-      `[Razorpay] Payment verified & order marked paid | orderId=${order.id}`,
-    );
+    this.logger.log(`[Razorpay] Payment verified & order marked paid | orderId=${order.id}`);
     this.logger.log(`[Tickets] Generating tickets | orderId=${order.id}`);
     await this.ticketsService.generateTicketsForOrder(order.id);
 
