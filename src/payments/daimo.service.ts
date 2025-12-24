@@ -135,19 +135,14 @@ export class DaimoService {
       // }
 
       // ✅ Update the order in DB based on paymentId
-      const currentOrder = await this.prisma.order.updateMany({
+      await this.prisma.order.updateMany({
         where: { daimoPaymentId: paymentId },
         data: {
           status: isComplete ? 'paid' : 'pending',
-          daimoTxHash: eventBody.payment.destination.txHash,
+          daimoTxHash: eventBody.destination.txHash,
           paymentVerified: true,
         },
       });
-
-      if (!currentOrder) {
-        console.log('No order with this paymentId found');
-        return;
-      }
 
       // Ticket Generation
       if (isComplete == true) {
