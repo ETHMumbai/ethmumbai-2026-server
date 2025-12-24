@@ -39,7 +39,7 @@ export class DaimoService {
           destinationAddress: this.DESTINATION_ADDRESS,
           chainId: baseUSDC.chainId, // Base mainnet
           tokenAddress: baseUSDC.token, // USDC
-          amountUnits: '0.1', //amount.toString(), // <-- FIXED: amount passed from argument
+          amountUnits: amount.toString(), // <-- FIXED: amount passed from argument
         },
         refundAddress: this.REFUND_ADDRESS,
         metadata: {
@@ -73,73 +73,28 @@ export class DaimoService {
     }
   }
 
-  async daimoWebhookHandler(eventBody: any) {
-    console.log('🔔 Daimo Event:', eventBody.data.type);
-
-    switch (eventBody.data.type) {
-      case 'payment_started':
-        console.log('🟡 Payment started:', eventBody.data);
-        await this.verifyPayment(eventBody, eventBody.data.paymentId);
-        break;
-
-      case 'payment_completed':
-        console.log('✅ Payment completed:', eventBody.data);
-        // update order → generate tickets → send emails
-        await this.verifyPayment(eventBody, eventBody.data.paymentId);
-        break;
-
-      case 'payment_bounced':
-        console.log('❌ Payment failed:', eventBody.data);
-        break;
-
-      case 'payment_refunded':
-        console.log('❌ Payment failed:', eventBody.data);
-        break;
-
-      default:
-        console.log('⚠️ Unknown event:', eventBody);
-    }
-  }
-
   /**
    * Verify Daimo Payment by Payment ID
    */
-  async verifyPayment(eventBody: any, paymentId: string) {
+  async verifyPayment(paymentId: string) {
     if (!paymentId) throw new BadRequestException('Missing Daimo paymentId');
 
     try {
-      // const response = await axios.get(`${this.DAIMO_API_URL}/${paymentId}`, {
-      //   headers: { 'Api-Key': this.DAIMO_API_KEY },
-      // });
+      const response = await axios.get(`${this.DAIMO_API_URL}/${paymentId}`, {
+        headers: { 'Api-Key': this.DAIMO_API_KEY },
+      });
 
-      // const payment = response.data?.payment || response.data;
+      const payment = response.data?.payment || response.data;
 
-      // console.log('🧾 Daimo payment fetched:', payment);
+      console.log('🧾 Daimo payment fetched:', payment);
 
-      const isComplete = eventBody.data.payment.status == 'payment_completed';
-
-      // const currentOrder = await this.prisma.order.findFirst({
-      //   where: { daimoPaymentId: paymentId },
-      // });
-
-      // //for switched paymentId use orderId for check
-      // if (currentOrder?.id == eventBody.data.metadata.orderId) {
-      //   await this.prisma.order.update({
-      //     where: { id: currentOrder?.id },
-      //     data: {
-      //       status: isComplete == 'payment_completed' ? 'paid' : 'pending',
-      //       daimoTxHash: eventBody.data.destination.txHash,
-      //       paymentVerified: true,
-      //     },
-      //   });
-      // }
-
+      const isComplete = payment.status === 'payment_completed';
       // ✅ Update the order in DB based on paymentId
       await this.prisma.order.updateMany({
         where: { daimoPaymentId: paymentId },
         data: {
           status: isComplete ? 'paid' : 'pending',
-          daimoTxHash: eventBody.data.destination.txHash,
+          daimoTxHash: payment.destination.txHash,
           paymentVerified: true,
         },
       });
@@ -156,10 +111,10 @@ export class DaimoService {
 
       return {
         success: isComplete,
-        status: eventBody.data.payment.status,
+        status: payment.status,
         message: isComplete
           ? '✅ Payment verified successfully'
-          : `⚠️ Payment not completed. Status: ${eventBody.data.payment.status}`,
+          : `⚠️ Payment not completed. Status: ${payment.status}`,
       };
     } catch (error) {
       console.error(
