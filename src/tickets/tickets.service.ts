@@ -97,6 +97,13 @@ export class TicketsService {
 
     // SEND BUYER CONFIRMATION
     await this.mailService.sendBuyerEmail(orderId);
+
+    await this.prisma.ticket.update({
+      where: { id: order.ticketId },
+      data: {
+        quantity: { decrement: order.participants.length },
+      },
+    });
   }
 
   async generateQRforTicket(ticketCode: string) {
@@ -177,61 +184,58 @@ export class TicketsService {
     };
   }
 
-async generateAndSendTicketForParticipant(input: {
-  firstName?: string;
-  email: string;
-}) {
-  const { firstName, email } = input;
+  async generateAndSendTicketForParticipant(input: {
+    firstName?: string;
+    email: string;
+  }) {
+    const { firstName, email } = input;
 
-  if (!email) {
-    throw new BadRequestException('Email is required');
-  }
+    if (!email) {
+      throw new BadRequestException('Email is required');
+    }
 
-  const pdfMap = new Map<string, Buffer>();
+    const pdfMap = new Map<string, Buffer>();
 
-  // 1. Generate ticket code
-  const ticketCode = await this.generateTicketCode();
+    // 1. Generate ticket code
+    const ticketCode = await this.generateTicketCode();
 
-  // 2. Generate QR
-  const { ticketUrl, qrHash } =
-    await this.generateQRforTicket(ticketCode);
-  
+    // 2. Generate QR
+    const { ticketUrl, qrHash } = await this.generateQRforTicket(ticketCode);
 
-  // 3. Generate QR image buffer
-  const qrImageBuffer = await QRCode.toBuffer(ticketUrl, {
-    width: 220,
-    errorCorrectionLevel: 'M',
-  });
+    // 3. Generate QR image buffer
+    const qrImageBuffer = await QRCode.toBuffer(ticketUrl, {
+      width: 220,
+      errorCorrectionLevel: 'M',
+    });
 
-  // 4. Generate PDF buffer
-  const pdfBuffer = await generateTicketPDFBuffer({
-    name: firstName || 'Participant',
-    ticketId: ticketCode,
-    qrImage: qrImageBuffer,
-  });
+    // 4. Generate PDF buffer
+    const pdfBuffer = await generateTicketPDFBuffer({
+      name: firstName || 'Participant',
+      ticketId: ticketCode,
+      qrImage: qrImageBuffer,
+    });
 
-  // 5. Store in pdfMap
-  pdfMap.set(ticketCode, pdfBuffer);
+    // 5. Store in pdfMap
+    pdfMap.set(ticketCode, pdfBuffer);
 
-  // 6. Send email (NO DB CHECKS / UPDATES)
-  await this.mailService.sendSingleParticipantEmail(
-    {
-      firstName,
+    // 6. Send email (NO DB CHECKS / UPDATES)
+    await this.mailService.sendSingleParticipantEmail(
+      {
+        firstName,
+        email,
+        ticketCode,
+      },
+      pdfMap,
+    );
+
+    return {
+      status: 'SUCCESS',
       email,
       ticketCode,
-    },
-    pdfMap,
-  );
-
-  return {
-    status: 'SUCCESS',
-    email,
-    ticketCode,
-    ticketUrl,
-    qrHash,
-  };
-}
-
+      ticketUrl,
+      qrHash,
+    };
+  }
 
   async verifyAndMark(token: string) {
     if (!token) throw new BadRequestException('token required');
