@@ -74,7 +74,7 @@ export class DaimoService {
   }
 
   async daimoWebhookHandler(eventBody: any) {
-    console.log('🔔 Daimo Event:', eventBody.data.type);
+    console.log('🔔 Daimo Event:', eventBody.data);
 
     switch (eventBody.data.type) {
       case 'payment_started':
