@@ -139,7 +139,7 @@ export class DaimoService {
         where: { daimoPaymentId: paymentId },
         data: {
           status: isComplete ? 'paid' : 'pending',
-          daimoTxHash: eventBody.destination.txHash,
+          daimoTxHash: eventBody.data.destination.txHash,
           paymentVerified: true,
         },
       });
@@ -156,10 +156,10 @@ export class DaimoService {
 
       return {
         success: isComplete,
-        status: eventBody.payment.status,
+        status: eventBody.data.payment.status,
         message: isComplete
           ? '✅ Payment verified successfully'
-          : `⚠️ Payment not completed. Status: ${eventBody.payment.status}`,
+          : `⚠️ Payment not completed. Status: ${eventBody.data.payment.status}`,
       };
     } catch (error) {
       console.error(
