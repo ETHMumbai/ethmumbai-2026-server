@@ -49,9 +49,9 @@ export class TicketsController {
     pdfDoc.pipe(res);
   }
 
-  @Get('/ticketCount')
-  async getTicketCount() {
-    return await this.ticketService.getTicketCount();
+  @Get('/ticketCount/:ticketType')
+  async getTicketCount(@Param('ticketType') ticketType: string) {
+    return await this.ticketService.getTicketCount(ticketType);
   }
 
   //check-in is happening when this endpoint is hit -> change this to include a button/check that can be used by the team to check-in

@@ -153,10 +153,10 @@ export class TicketsService {
     }
   }
 
-  async getTicketCount() {
+  async getTicketCount(ticketType: string) {
     // Total earlybird tickets available
     const ticket = await this.prisma.ticket.findFirst({
-      where: { type: 'earlybird' },
+      where: { type: ticketType },
       select: { quantity: true },
     });
 
@@ -166,7 +166,7 @@ export class TicketsService {
 
     // Tickets already generated / sold (ONLY earlybird)
     const usedCount = await this.prisma.generatedTicket.findMany({
-      where: { order: { ticket: { type: 'earlybird' } } },
+      where: { order: { ticket: { type: ticketType } } },
     });
 
     return {
