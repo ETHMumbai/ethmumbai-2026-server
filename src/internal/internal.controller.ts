@@ -258,9 +258,7 @@ export class InternalController {
     const participant = await this.prisma.participant.findFirst({
       where: {
         email: email,
-      },
-      select: {
-        id: true,
+        order: { status: 'paid' },
       },
     });
 
