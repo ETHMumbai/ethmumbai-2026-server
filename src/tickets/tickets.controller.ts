@@ -50,6 +50,11 @@ export class TicketsController {
   }
 
   @Get('/ticketCount/:ticketType')
+  async getTicketCountByType(@Param('ticketType') ticketType: string) {
+    return await this.ticketService.getTicketCount(ticketType);
+  }
+
+  @Get('/ticketCount/')
   async getTicketCount(@Param('ticketType') ticketType: string) {
     return await this.ticketService.getTicketCount(ticketType);
   }
