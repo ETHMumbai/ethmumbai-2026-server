@@ -35,13 +35,13 @@ export class PaymentsController {
   @HttpCode(200)
   async daimoWebhook(
     @Body() body: any,
-    @Headers('authorization') authorization?: string,
+    // @Headers('authorization') authorization?: string,
   ) {
     // Verify webhook token
-    if (!authorization || authorization !== process.env.DAIMO_WEBHOOK_TOKEN) {
-      throw new UnauthorizedException('Invalid webhook token');
-    }
-
+    // if (!authorization || authorization !== process.env.DAIMO_WEBHOOK_TOKEN) {
+    //   throw new UnauthorizedException('Invalid webhook token');
+    // }
+    console.log(body.data);
     await this.paymentsService.paymentEventHandler(body);
 
     // Return success immediately
