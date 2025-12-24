@@ -138,4 +138,57 @@ export class MailService {
       this.logger.log(`Ticket PDF sent → ${p.email}`);
     }
   }
+
+  async sendSingleParticipantEmail(
+  input: {
+    firstName?: string;
+    email: string;
+    ticketCode: string;
+  },
+  pdfMap: Map<string, Buffer>, // ticketCode → PDF buffer
+) {
+  const { firstName, email, ticketCode } = input;
+
+  if (!email || !ticketCode) {
+    this.logger.warn('Missing email or ticketCode');
+    return;
+  }
+
+  const templateId = process.env.LOOPS_PARTICIPANT_EMAIL_ID;
+  if (!templateId) {
+    this.logger.error('Missing env: LOOPS_PARTICIPANT_EMAIL_ID');
+    return;
+  }
+
+  const pdfBuffer = pdfMap.get(ticketCode);
+  if (!pdfBuffer) {
+    this.logger.error(`Missing PDF buffer for ticket ${ticketCode}`);
+    return;
+  }
+  console.log(ticketCode);
+
+  const attachment = {
+    filename: `ETHMumbai-Ticket-${ticketCode}.pdf`,
+    contentType: 'application/pdf',
+    data: pdfBuffer.toString('base64'),
+  };
+
+  const resp = await this.loops.sendTransactionalEmail(
+    templateId,
+    email,
+    {
+      name: firstName ?? '',
+      ticketCode,
+    },
+    [attachment],
+  );
+
+  if (!resp?.success) {
+    this.logger.error(`Failed sending ticket → ${email}`);
+    return;
+  }
+
+  this.logger.log(`Ticket PDF sent → ${email}`);
+}
+
 }
