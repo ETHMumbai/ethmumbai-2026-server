@@ -79,13 +79,13 @@ export class DaimoService {
     switch (eventBody.data.type) {
       case 'payment_started':
         console.log('🟡 Payment started:', eventBody.data);
-        // await this.verifyPayment(eventBody, eventBody.data.paymentId);
+        await this.verifyPayment(eventBody, eventBody.data.paymentId);
         break;
 
       case 'payment_completed':
         console.log('✅ Payment completed:', eventBody.data);
         // update order → generate tickets → send emails
-        // await this.verifyPayment(eventBody, eventBody.data.paymentId);
+        await this.verifyPayment(eventBody, eventBody.data.paymentId);
         break;
 
       case 'payment_bounced':
@@ -116,13 +116,29 @@ export class DaimoService {
 
       // console.log('🧾 Daimo payment fetched:', payment);
 
-      const isComplete = eventBody.data.payment.status;
+      const isComplete = eventBody.data.payment.status == 'payment_completed';
+
+      // const currentOrder = await this.prisma.order.findFirst({
+      //   where: { daimoPaymentId: paymentId },
+      // });
+
+      // //for switched paymentId use orderId for check
+      // if (currentOrder?.id == eventBody.data.metadata.orderId) {
+      //   await this.prisma.order.update({
+      //     where: { id: currentOrder?.id },
+      //     data: {
+      //       status: isComplete == 'payment_completed' ? 'paid' : 'pending',
+      //       daimoTxHash: eventBody.data.destination.txHash,
+      //       paymentVerified: true,
+      //     },
+      //   });
+      // }
 
       // ✅ Update the order in DB based on paymentId
       await this.prisma.order.updateMany({
         where: { daimoPaymentId: paymentId },
         data: {
-          status: isComplete == 'payment_completed' ? 'paid' : 'pending',
+          status: isComplete ? 'paid' : 'pending',
           daimoTxHash: eventBody.data.destination.txHash,
           paymentVerified: true,
         },
