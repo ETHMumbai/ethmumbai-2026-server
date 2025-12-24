@@ -41,9 +41,7 @@ export class PaymentsController {
     // if (!authorization || authorization !== process.env.DAIMO_WEBHOOK_TOKEN) {
     //   throw new UnauthorizedException('Invalid webhook token');
     // }
-    console.log(body.type);
-    console.log(body);
-
+    console.log(body.data);
     await this.paymentsService.paymentEventHandler(body);
 
     // Return success immediately

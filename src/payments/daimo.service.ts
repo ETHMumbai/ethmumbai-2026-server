@@ -74,18 +74,18 @@ export class DaimoService {
   }
 
   async daimoWebhookHandler(eventBody: any) {
-    console.log('🔔 Daimo Event:', eventBody);
+    console.log('🔔 Daimo Event:', eventBody.data);
 
     switch (eventBody.data.type) {
       case 'payment_started':
-        console.log('🟡 Payment started:', eventBody.type);
-        await this.verifyPayment(eventBody, eventBody.paymentId);
+        console.log('🟡 Payment started:', eventBody.data);
+        await this.verifyPayment(eventBody, eventBody.data.paymentId);
         break;
 
       case 'payment_completed':
-        console.log('✅ Payment completed:', eventBody.type);
+        console.log('✅ Payment completed:', eventBody.data);
         // update order → generate tickets → send emails
-        await this.verifyPayment(eventBody, eventBody.paymentId);
+        await this.verifyPayment(eventBody, eventBody.data.paymentId);
         break;
 
       case 'payment_bounced':
@@ -116,7 +116,7 @@ export class DaimoService {
 
       // console.log('🧾 Daimo payment fetched:', payment);
 
-      const isComplete = eventBody.payment.status == 'payment_completed';
+      const isComplete = eventBody.data.payment.status == 'payment_completed';
 
       // const currentOrder = await this.prisma.order.findFirst({
       //   where: { daimoPaymentId: paymentId },
