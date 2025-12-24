@@ -45,6 +45,29 @@ export class TicketsService {
 
     if (!order) throw new NotFoundException('Order not found');
 
+    const ticketQty = order.participants.length;
+
+    const ticket = await this.prisma.ticket.findFirst({
+      where: {
+        isActive: true,
+        remainingQuantity: { gt: 0 },
+      },
+      orderBy: { priority: 'asc' },
+    });
+
+    if (!ticket || ticket.remainingQuantity < ticketQty) {
+      throw new BadRequestException('Tickets sold out');
+    }
+
+    await this.prisma.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        remainingQuantity: {
+          decrement: ticketQty,
+        },
+      },
+    });
+
     const pdfMap = new Map<string, Buffer>();
 
     await Promise.all(

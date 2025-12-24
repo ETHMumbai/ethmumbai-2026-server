@@ -15,6 +15,9 @@ model Ticket {
   crypto   Float   @default(12)
   quantity Int
   orders   Order[]
+  remainingQuantity Int
+  isActive          Boolean  @default(true)
+  priority          Int      @default(99)
 }
 
 model Order {
