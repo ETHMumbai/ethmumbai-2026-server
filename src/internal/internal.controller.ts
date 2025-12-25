@@ -362,7 +362,7 @@ export class InternalController {
               create: {
                 firstName: firstName,
                 lastName: lastName ?? null,
-                email: 'test@test.com',
+                email: 'website@ethmumbai.in',
                 address: {
                   create: {
                     line1: '',
