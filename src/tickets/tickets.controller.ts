@@ -85,10 +85,10 @@ async getCurrentTicket() {
   //   return await this.ticketService.getTicketCount(ticketType);
   // }
 
-  @Get('/ticketCount')
-  async getTicketCount(@Param('ticketType') ticketType: string) {
-    return await this.ticketService.getTicketCount();
-  }
+  // @Get('/ticketCount')
+  // async getTicketCount(@Param('ticketType') ticketType: string) {
+  //   return await this.ticketService.getTicketCount();
+  // }
 
   //check-in is happening when this endpoint is hit -> change this to include a button/check that can be used by the team to check-in
   @UseGuards(ApiKeyGuard)
