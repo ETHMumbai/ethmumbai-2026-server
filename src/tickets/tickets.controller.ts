@@ -43,7 +43,7 @@ async getCurrentTicket() {
       return { message: 'No active tickets available.' };
     }
 
-    console.log('[DEBUG] Current active ticket:', ticket);
+    // console.log('[DEBUG] Current active ticket:', ticket);
     return ticket;
   } catch (error) {
     console.error('[ERROR] Failed to fetch current ticket:', error);
