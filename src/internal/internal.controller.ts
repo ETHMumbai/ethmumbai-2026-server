@@ -258,9 +258,7 @@ export class InternalController {
     const participant = await this.prisma.participant.findFirst({
       where: {
         email: email,
-      },
-      select: {
-        id: true,
+        order: { status: 'paid' },
       },
     });
 
@@ -299,6 +297,7 @@ export class InternalController {
         paymentMethod:
           order.paymentType === 'RAZORPAY' ? 'Credit/Debit Card' : 'Crypto',
         purchaseDate: order.createdAt,
+        orderFiat: order.ticket.fiat,
         totalAmount: order.amount,
         currency: order.currency,
         buyerEmail: order.buyer.email,
@@ -313,9 +312,7 @@ export class InternalController {
   }
 
   @Post('status-by-users')
-  async getOrderStatusByUsers(
-    @Body() users: { email: string }[],
-  ) {
+  async getOrderStatusByUsers(@Body() users: { email: string }[]) {
     return this.ticketsService.getOrderStatusByUsers(users);
   }
 
@@ -410,91 +407,87 @@ export class InternalController {
   }
 
   @Post('sendTicketsForExistingOrder')
-async sendTicketsForExistingOrder(
-  @Body() body: { firstName: string; lastName: string; email: string }[],
-) {
-  const results: {
-    email: string;
-    status: 'SUCCESS' | 'SKIPPED';
-    reason?: string;
-    orderId?: string;
-  }[] = [];
+  async sendTicketsForExistingOrder(
+    @Body() body: { firstName: string; lastName: string; email: string }[],
+  ) {
+    const results: {
+      email: string;
+      status: 'SUCCESS' | 'SKIPPED';
+      reason?: string;
+      orderId?: string;
+    }[] = [];
 
-  for (const { email } of body) {
-    const participant = await this.prisma.participant.findUnique({
-      where: { email },
-      include: {
-        order: true,
-      },
-    });
+    for (const { email } of body) {
+      const participant = await this.prisma.participant.findUnique({
+        where: { email },
+        include: {
+          order: true,
+        },
+      });
 
-    if (!participant) {
+      if (!participant) {
+        results.push({
+          email,
+          status: 'SKIPPED',
+          reason: 'Participant not found',
+        });
+        continue;
+      }
+
+      if (!participant.order) {
+        results.push({
+          email,
+          status: 'SKIPPED',
+          reason: 'Order not found',
+        });
+        continue;
+      }
+
+      if (participant.order.paymentVerified) {
+        results.push({
+          email,
+          status: 'SKIPPED',
+          reason: 'Payment already verified',
+        });
+        continue;
+      }
+
+      // ✅ Generate tickets (reuses existing logic)
+      await this.ticketsService.generateTicketsForOrder(participant.order.id);
+
+      // ✅ Mark tickets as sent at ORDER level
+      await this.prisma.order.update({
+        where: { id: participant.order.id },
+        data: {
+          buyerEmailSent: true,
+          buyerEmailSentAt: new Date(),
+        },
+      });
+
       results.push({
         email,
-        status: 'SKIPPED',
-        reason: 'Participant not found',
+        status: 'SUCCESS',
+        orderId: participant.order.id,
       });
-      continue;
     }
 
-    if (!participant.order) {
-      results.push({
-        email,
-        status: 'SKIPPED',
-        reason: 'Order not found',
-      });
-      continue;
-    }
-
-    if (participant.order.paymentVerified) {
-      results.push({
-        email,
-        status: 'SKIPPED',
-        reason: 'Payment already verified',
-      });
-      continue;
-    }
-
-    // ✅ Generate tickets (reuses existing logic)
-    await this.ticketsService.generateTicketsForOrder(
-      participant.order.id,
-    );
-
-    // ✅ Mark tickets as sent at ORDER level
-    await this.prisma.order.update({
-      where: { id: participant.order.id },
-      data: {
-        buyerEmailSent: true,
-        buyerEmailSentAt: new Date(),
-      },
-    });
-
-    results.push({
-      email,
-      status: 'SUCCESS',
-      orderId: participant.order.id,
-    });
+    return {
+      processed: body.length,
+      results,
+    };
   }
 
-  return {
-    processed: body.length,
-    results,
-  };
-}
-
-@Post('sendManualTicket')
-async sendManualTicket(
-  @Body()
-  body: {
-    firstName?: string;
-    email: string;
-  },
-) {
-  return this.ticketsService.generateAndSendTicketForParticipant({
-    firstName: body.firstName,
-    email: body.email,
-  });
-}
-
-
+  @Post('sendManualTicket')
+  async sendManualTicket(
+    @Body()
+    body: {
+      firstName?: string;
+      email: string;
+    },
+  ) {
+    return this.ticketsService.generateAndSendTicketForParticipant({
+      firstName: body.firstName,
+      email: body.email,
+    });
+  }
 }
