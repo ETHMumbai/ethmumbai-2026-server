@@ -8,13 +8,16 @@ datasource db {
 }
 
 model Ticket {
-  id       String  @id @default(uuid())
-  title    String  @unique
-  type     String
-  fiat     Float   @default(999)
-  crypto   Float   @default(12)
-  quantity Int
-  orders   Order[]
+  id                String  @id @default(uuid())
+  title             String  @unique
+  type              String
+  fiat              Float   @default(999)
+  crypto            Float   @default(12)
+  quantity          Int
+  isActive          Boolean @default(true)
+  priority          Int     @default(99)
+  remainingQuantity Int
+  orders            Order[]
 }
 
 model Order {
@@ -23,8 +26,6 @@ model Order {
   razorpayPaymentId String?           @unique
   daimoPaymentId    String?           @unique
   daimoTxHash       String?           @unique
-  buyerId           String            
-  buyer             Buyer             @relation(fields: [buyerId], references: [id])
   amount            Float
   currency          String            @default("INR")
   status            String            @default("created")
@@ -36,53 +37,49 @@ model Order {
   ticketId          String
   buyerEmailSent    Boolean           @default(false)
   buyerEmailSentAt  DateTime?
+  buyerId           String
   generatedTickets  GeneratedTicket[]
+  buyer             Buyer             @relation(fields: [buyerId], references: [id])
   ticket            Ticket            @relation(fields: [ticketId], references: [id])
   participants      Participant[]
 }
 
 model Buyer {
-  id        String   @id @default(uuid())
-  firstName String
-  lastName  String
-  email     String  
-  organisation  String? 
-
-  address   Address?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
- 
-  order     Order[]
+  id           String   @id @default(uuid())
+  firstName    String
+  lastName     String
+  email        String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  organisation String?
+  address      Address?
+  order        Order[]
 }
 
 model Address {
-  id           String  @id @default(uuid())
-
-  line1        String
-  line2        String?
-  city         String
-  state        String
-  country      String
-  postalCode   String
-
-  buyerId      String  @unique
-  buyer        Buyer   @relation(fields: [buyerId], references: [id], onDelete: Cascade)
-
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id         String   @id @default(uuid())
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  country    String
+  postalCode String
+  buyerId    String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  buyer      Buyer    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
 }
 
 model Participant {
   id              String           @id @default(uuid())
   orderId         String
-  firstName       String?
-  lastName        String?
-  email           String          @unique
-  organisation    String?
+  email           String           @unique
   isBuyer         Boolean          @default(false)
   emailSent       Boolean          @default(false)
   emailSentAt     DateTime?
+  firstName       String?
+  lastName        String?
+  organisation    String?
   generatedTicket GeneratedTicket?
   order           Order            @relation(fields: [orderId], references: [id])
 }
@@ -92,12 +89,10 @@ model GeneratedTicket {
   ticketCode    String      @unique
   participantId String      @unique
   orderId       String
-
   checkedIn     Boolean     @default(false)
   checkedInAt   DateTime    @default(now())
   qrHash        String      @unique
   qrUrl         String?
-
   order         Order       @relation(fields: [orderId], references: [id])
   participant   Participant @relation(fields: [participantId], references: [id])
 }

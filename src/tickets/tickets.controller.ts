@@ -8,10 +8,13 @@ import {
   Post,
   Param,
   Res,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
+import { PrismaService } from '../prisma/prisma.service';
 import type { Response } from 'express';
 import * as QRCode from 'qrcode';
+// import { generateTicketsForOrder } from ./TicketsService
 import { generateTicketPDF } from './generateTicket';
 import PDFDocument from 'pdfkit';
 import * as path from 'path';
@@ -19,7 +22,35 @@ import { ApiKeyGuard } from '../utils/api-key-auth';
 
 @Controller('t')
 export class TicketsController {
-  constructor(private readonly ticketService: TicketsService) {}
+  constructor(
+    private readonly ticketService: TicketsService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+@Get('/current')
+async getCurrentTicket() {
+  try {
+    const ticket = await this.prisma.ticket.findFirst({
+      where: {
+        isActive: true,
+        remainingQuantity: { gt: 0 },
+      },
+      orderBy: { priority: 'asc' },
+    });
+
+    if (!ticket) {
+      console.log('[DEBUG] No active tickets found.');
+      return { message: 'No active tickets available.' };
+    }
+
+    // console.log('[DEBUG] Current active ticket:', ticket);
+    return ticket;
+  } catch (error) {
+    console.error('[ERROR] Failed to fetch current ticket:', error);
+    throw new InternalServerErrorException('Could not fetch current ticket');
+  }
+}
+
 
   @Get('/preview/pdf')
   async previewTicketPdf(
@@ -49,14 +80,14 @@ export class TicketsController {
     pdfDoc.pipe(res);
   }
 
-  @Get('/ticketCount/:ticketType')
-  async getTicketCountByType(@Param('ticketType') ticketType: string) {
-    return await this.ticketService.getTicketCount(ticketType);
-  }
+  // @Get('/ticketCount/:ticketType')
+  // async getTicketCountByType(@Param('ticketType') ticketType: string) {
+  //   return await this.ticketService.getTicketCount(ticketType);
+  // }
 
-  @Get('/ticketCount/')
+  @Get('/ticketCount')
   async getTicketCount(@Param('ticketType') ticketType: string) {
-    return await this.ticketService.getTicketCount(ticketType);
+    return await this.ticketService.getTicketCount();
   }
 
   //check-in is happening when this endpoint is hit -> change this to include a button/check that can be used by the team to check-in
