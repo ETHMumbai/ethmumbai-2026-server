@@ -210,8 +210,9 @@ export class TicketsService {
   async generateAndSendTicketForParticipant(input: {
     firstName?: string;
     email: string;
+    ticketCode: string;
   }) {
-    const { firstName, email } = input;
+    const { firstName, email, ticketCode } = input;
 
     if (!email) {
       throw new BadRequestException('Email is required');
@@ -220,7 +221,7 @@ export class TicketsService {
     const pdfMap = new Map<string, Buffer>();
 
     // 1. Generate ticket code
-    const ticketCode = await this.generateTicketCode();
+    // const ticketCode = await this.generateTicketCode();
 
     // 2. Generate QR
     const { ticketUrl, qrHash } = await this.generateQRforTicket(ticketCode);

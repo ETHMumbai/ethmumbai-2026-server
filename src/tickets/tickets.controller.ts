@@ -27,30 +27,29 @@ export class TicketsController {
     private readonly prisma: PrismaService,
   ) {}
 
-@Get('/current')
-async getCurrentTicket() {
-  try {
-    const ticket = await this.prisma.ticket.findFirst({
-      where: {
-        isActive: true,
-        remainingQuantity: { gt: 0 },
-      },
-      orderBy: { priority: 'asc' },
-    });
+  @Get('/current')
+  async getCurrentTicket() {
+    try {
+      const ticket = await this.prisma.ticket.findFirst({
+        where: {
+          isActive: true,
+          remainingQuantity: { gt: 0 },
+        },
+        orderBy: { priority: 'asc' },
+      });
 
-    if (!ticket) {
-      console.log('[DEBUG] No active tickets found.');
-      return { message: 'No active tickets available.' };
+      if (!ticket) {
+        console.log('[DEBUG] No active tickets found.');
+        return { message: 'No active tickets available.' };
+      }
+
+      // console.log('[DEBUG] Current active ticket:', ticket);
+      return ticket;
+    } catch (error) {
+      console.error('[ERROR] Failed to fetch current ticket:', error);
+      throw new InternalServerErrorException('Could not fetch current ticket');
     }
-
-    // console.log('[DEBUG] Current active ticket:', ticket);
-    return ticket;
-  } catch (error) {
-    console.error('[ERROR] Failed to fetch current ticket:', error);
-    throw new InternalServerErrorException('Could not fetch current ticket');
   }
-}
-
 
   @Get('/preview/pdf')
   async previewTicketPdf(
@@ -85,10 +84,10 @@ async getCurrentTicket() {
   //   return await this.ticketService.getTicketCount(ticketType);
   // }
 
-  @Get('/ticketCount')
-  async getTicketCount(@Param('ticketType') ticketType: string) {
-    return await this.ticketService.getTicketCount();
-  }
+  // @Get('/ticketCount')
+  // async getTicketCount(@Param('ticketType') ticketType: string) {
+  //   return await this.ticketService.getTicketCount();
+  // }
 
   //check-in is happening when this endpoint is hit -> change this to include a button/check that can be used by the team to check-in
   @UseGuards(ApiKeyGuard)

@@ -483,11 +483,13 @@ export class InternalController {
     body: {
       firstName?: string;
       email: string;
+      ticketCode: string;
     },
   ) {
     return this.ticketsService.generateAndSendTicketForParticipant({
       firstName: body.firstName,
       email: body.email,
+      ticketCode: body.ticketCode,
     });
   }
 }
