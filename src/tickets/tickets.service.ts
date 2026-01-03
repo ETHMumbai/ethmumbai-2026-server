@@ -13,6 +13,10 @@ import {
   getPngBufferFromDataUrl,
   savePngFromDataUrl,
 } from 'src/utils/handle-png';
+import { Response } from 'express';
+import { createCanvas, loadImage, registerFont } from 'canvas';
+import path from 'path';
+import sharp from 'sharp';
 
 @Injectable()
 export class TicketsService {
@@ -303,6 +307,58 @@ export class TicketsService {
         buyerName: orderInfo?.buyer.firstName || 'Buyer',
       };
     }
+  }
+
+  async visualTicketGeneration(firstName: string, res: Response) {
+    if (!firstName) {
+      throw new BadRequestException('Missing firstName (f) parameter');
+    }
+
+    const fontPath = path.join(
+      process.cwd(),
+      'assets/fonts/MPLUSRounded1c-Bold.ttf',
+    );
+
+    registerFont(fontPath, {
+      family: 'M PLUS Rounded 1c',
+      weight: '700',
+    });
+
+    console.log(fontPath);
+
+    const width = 1920;
+    const height = 1080;
+
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // OPTIONAL: use a PNG template
+    const bg = await loadImage('src/assets/visual/early bird ticket.png');
+    ctx.drawImage(bg, 0, 0, width, height);
+
+    // Background (remove if using template)
+    // ctx.fillStyle = '#ffffff';
+    // ctx.fillRect(0, 0, width, height);
+
+    // Text styling
+    ctx.fillStyle = '#000000';
+    ctx.font = '700 64px "M PLUS Rounded 1c"';
+    console.log('Resolved →', ctx.font);
+    ctx.textAlign = 'left';
+
+    // Fixed position
+    const x = 576;
+    const y = 365;
+
+    ctx.fillText(firstName, x, y);
+
+    // Send PNG response
+    res.set({
+      'Content-Type': 'image/png',
+      'Content-Disposition': 'inline; filename="ticket.png"',
+    });
+
+    canvas.createPNGStream().pipe(res);
   }
 
   async getTicketCount(ticketType: string) {
