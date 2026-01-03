@@ -18,6 +18,10 @@ import { generateInvoiceNumberForOrder } from 'src/utils/ticket.utils';
 import { InvoiceData } from '../utils/generateInvoicePdf';
 import Razorpay from 'razorpay';
 import { getDiscount } from 'src/utils/discount';
+import { Response } from 'express';
+import { createCanvas, loadImage, registerFont } from 'canvas';
+import path from 'path';
+import sharp from 'sharp';
 
 @Injectable()
 export class TicketsService {
@@ -329,6 +333,64 @@ export class TicketsService {
     }
   }
 
+  async visualTicketGeneration(firstName: string, res: Response) {
+    if (!firstName) {
+      throw new BadRequestException('Missing firstName (f) parameter');
+    }
+
+    const fontPath = path.join(
+      __dirname,
+      '../assets/fonts/MPLUSRounded1c-Bold.ttf',
+    );
+
+    registerFont(fontPath, {
+      family: 'M PLUS Rounded 1c',
+      weight: '700',
+    });
+
+    console.log(fontPath);
+
+    const width = 1920;
+    const height = 1080;
+
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // OPTIONAL: use a PNG template
+    const bgPath = path.join(
+      __dirname,
+      "../assets/visual/early-bird-ticket.png",
+    );
+
+    const bg = await loadImage(bgPath);
+    ctx.drawImage(bg, 0, 0, width, height);
+
+    // Background (remove if using template)
+    // ctx.fillStyle = '#ffffff';
+    // ctx.fillRect(0, 0, width, height);
+
+    // Text styling
+    ctx.fillStyle = '#000000';
+    ctx.font = '700 64px "M PLUS Rounded 1c"';
+    console.log('Resolved →', ctx.font);
+    ctx.textAlign = 'left';
+
+    // Fixed position
+    const x = 576;
+    const y = 365;
+
+    ctx.fillText(firstName, x, y);
+
+    // Send PNG response
+    res.set({
+      'Content-Type': 'image/png',
+      'Content-Disposition': 'attachment; filename="ticket.png"',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    });
+
+    canvas.createPNGStream().pipe(res);
+  }
+
   async getTicketCount(ticketType: string) {
     // Total earlybird tickets available
     const ticket = await this.prisma.ticket.findFirst({
@@ -449,50 +511,48 @@ export class TicketsService {
   }
 
   async getCurrentTicketForInvoice() {
-  const ticket = await this.prisma.ticket.findFirst({
-    where: {
-      isActive: true,
-      remainingQuantity: { gt: 0 },
-    },
-    orderBy: { priority: 'asc' },
-  });
+    const ticket = await this.prisma.ticket.findFirst({
+      where: {
+        isActive: true,
+        remainingQuantity: { gt: 0 },
+      },
+      orderBy: { priority: 'asc' },
+    });
 
-  if (!ticket) {
-    throw new NotFoundException('No active tickets available.');
+    if (!ticket) {
+      throw new NotFoundException('No active tickets available.');
+    }
+
+    const discount = getDiscount(ticket.fiat); // e.g., { amount, percentage, originalPrice }
+    const discountedPrice = ticket.fiat; // price after discount
+
+    // Default values
+    let excludingGstCost = 0;
+    let cgst = 0;
+    let sgst = 0;
+
+    // Set values based on discount percentage
+    if (discount.percentage === 50) {
+      excludingGstCost = 1153.73;
+      cgst = 95.27;
+      sgst = 95.27;
+    } else if (discount.percentage === 40) {
+      excludingGstCost = 1270.3;
+      cgst = 114.35;
+      sgst = 114.35;
+    } else {
+      // fallback if other discount percentage
+      excludingGstCost = 1270.3;
+      cgst = 114.35;
+      sgst = 114.35;
+    }
+
+    return {
+      ...ticket,
+      discount,
+      excludingGstCost,
+      cgst,
+      sgst,
+    };
   }
-
-  const discount = getDiscount(ticket.fiat); // e.g., { amount, percentage, originalPrice }
-  const discountedPrice = ticket.fiat; // price after discount
-
-  // Default values
-  let excludingGstCost = 0;
-  let cgst = 0;
-  let sgst = 0;
-
-  // Set values based on discount percentage
-  if (discount.percentage === 50) {
-    excludingGstCost = 1153.73;
-    cgst = 95.27;
-    sgst = 95.27;
-  } else if (discount.percentage === 40) {
-    excludingGstCost = 1270.3;
-    cgst = 114.35;
-    sgst = 114.35;
-  } else {
-    // fallback if other discount percentage
-    excludingGstCost = 1270.3;
-    cgst = 114.35;
-    sgst = 114.35;
-  }
-
-  return {
-    ...ticket,
-    discount,
-    excludingGstCost,
-    cgst,
-    sgst,
-  };
-}
-
-
 }

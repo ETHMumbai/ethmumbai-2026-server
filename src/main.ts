@@ -7,7 +7,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://localhost:3000','https://www.ethmumbai.in', 'https://ethmumbai-2026-dec-ui-git-earlybird-ethmumbais-projects.vercel.app' ], // your Vite dev server
+    origin: [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://www.ethmumbai.in',
+      'https://ethmumbai-2026-dec-ui-git-earlybird-ethmumbais-projects.vercel.app',
+    ], // your Vite dev server
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
@@ -17,7 +22,7 @@ async function bootstrap() {
     ],
     credentials: true, // set true only if you use cookies/auth headers
     preflightContinue: false,
-  optionsSuccessStatus: 204,
+    optionsSuccessStatus: 204,
   });
   console.log('DATABASE_URL at startup:', process.env.DATABASE_URL);
 

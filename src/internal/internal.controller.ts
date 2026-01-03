@@ -283,7 +283,12 @@ export class InternalController {
           include: { address: true },
         },
         participants: {
-          include: { generatedTicket: true },
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            generatedTicket: { select: { ticketCode: true } },
+          },
         },
         ticket: true,
       },

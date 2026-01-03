@@ -27,9 +27,16 @@ import {
 import PDFDocument from 'pdfkit';
 import * as path from 'path';
 import * as fs from 'fs';
+import { createCanvas, loadImage, registerFont } from 'canvas';
 import { ApiKeyGuard } from '../utils/api-key-auth';
 import Razorpay from 'razorpay';
 import { generateInvoiceNumberForOrder } from 'src/utils/ticket.utils';
+
+registerFont('assets/fonts/MPLUSRounded1c-Bold.ttf', {
+  family: 'Rounded Mplus 1c',
+  weight: 'bold',
+  style: 'not-rotated',
+});
 
 @Controller('t')
 export class TicketsController {
@@ -139,6 +146,49 @@ export class TicketsController {
     });
 
     pdfDoc.pipe(res);
+  }
+  @Get('/visual/')
+  async visualTicket(
+    @Query('firstName') firstName: string,
+    @Res() res: Response,
+  ) {
+    await this.ticketService.visualTicketGeneration(firstName, res);
+    // if (!firstName) {
+    //   throw new BadRequestException('Missing firstName (f) parameter');
+    // }
+
+    // const width = 1920;
+    // const height = 1080;
+
+    // const canvas = createCanvas(width, height);
+    // const ctx = canvas.getContext('2d');
+
+    // // OPTIONAL: use a PNG template
+    // const bg = await loadImage('src/assets/visual/early bird ticket.png');
+    // ctx.drawImage(bg, 0, 0, width, height);
+
+    // // Background (remove if using template)
+    // // ctx.fillStyle = '#ffffff';
+    // // ctx.fillRect(0, 0, width, height);
+
+    // // Text styling
+    // ctx.fillStyle = '#000000';
+    // ctx.font = 'bold 64px "Rounded Mplus 1c"';
+    // ctx.textAlign = 'left';
+
+    // // Fixed position
+    // const x = 576;
+    // const y = 365;
+
+    // ctx.fillText(firstName, x, y);
+
+    // // Send PNG response
+    // res.set({
+    //   'Content-Type': 'image/png',
+    //   'Content-Disposition': 'inline; filename="ticket.png"',
+    // });
+
+    // canvas.createPNGStream().pipe(res);
   }
 
   // @Get('/ticketCount/:ticketType')

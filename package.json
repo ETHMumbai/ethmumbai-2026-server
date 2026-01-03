@@ -32,6 +32,7 @@
     "@prisma/client": "^6.18.0",
     "@tanstack/react-query": "^5.90.5",
     "axios": "^1.12.2",
+    "canvas": "^3.2.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "crypto": "^1.0.1",
@@ -44,6 +45,7 @@
     "razorpay": "^2.9.6",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "sharp": "^0.34.5",
     "viem": "^2.38.4",
     "wagmi": "^2.18.2"
   },
