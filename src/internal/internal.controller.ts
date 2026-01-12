@@ -295,7 +295,7 @@ export class InternalController {
         ticketType: order.ticket.title,
         quantity: order.participants.length,
         paymentMethod:
-          order.paymentType === 'RAZORPAY' ? 'Credit/Debit Card' : 'Crypto',
+          order.paymentType === 'RAZORPAY' ? 'Razorpay' : 'Crypto',
         purchaseDate: order.createdAt,
         orderFiat: order.ticket.fiat,
         totalAmount: order.amount,
