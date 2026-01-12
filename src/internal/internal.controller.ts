@@ -298,6 +298,7 @@ export class InternalController {
           order.paymentType === 'RAZORPAY' ? 'Razorpay' : 'Crypto',
         purchaseDate: order.createdAt,
         orderFiat: order.ticket.fiat,
+        orderCrypto: order.ticket.crypto,
         totalAmount: order.amount,
         currency: order.currency,
         buyerEmail: order.buyer.email,
