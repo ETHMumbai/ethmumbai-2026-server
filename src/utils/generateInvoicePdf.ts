@@ -28,6 +28,40 @@ export function generateInvoicePDF(
   const doc = new PDFDocument({ size: 'A4', margin: 50 });
   const pageWidth = doc.page.width;
 
+    const fontRegular = path.join(
+      __dirname,
+      "../assets/fonts/InterTight-Regular.ttf"
+    );
+      const fontBold = path.join(
+        __dirname,
+        "../assets/fonts/InterTight-Bold.ttf"
+      );
+  
+      const fontMplus = path.join(
+      __dirname,
+      "../assets/fonts/MPLUSRounded1c-Black.ttf"
+    );
+  
+  
+    doc.registerFont("Regular", fontRegular);
+    doc.registerFont("Bold", fontBold);
+    doc.registerFont("MPlus", fontMplus);
+
+  // Global horizontal shift (increase = move left)
+  const SHIFT_LEFT = 50;
+
+  // Right section
+  const RIGHT_LABEL_X = pageWidth - 250 - SHIFT_LEFT;
+  const RIGHT_VALUE_X = pageWidth - 150 - SHIFT_LEFT;
+  const RIGHT_TITLE_X = pageWidth - 300 - SHIFT_LEFT;
+
+  // Table columns
+  const COL_DESC = 50 - SHIFT_LEFT;
+  const COL_QTY = 350 - SHIFT_LEFT;
+  const COL_PRICE = 420 - SHIFT_LEFT;
+  const COL_TOTAL = 500 - SHIFT_LEFT;
+  const TABLE_RIGHT_EDGE = pageWidth - 50 - SHIFT_LEFT;
+
   // ✅ SAFE NORMALIZATION
   const quantity = Number(data.item?.quantity ?? 1);
   const price = Number(data.item?.price ?? 0);
@@ -40,32 +74,40 @@ export function generateInvoicePDF(
 
   doc
     .fontSize(26)
-    .font('Helvetica-Bold')
-    .text('TAX INVOICE', pageWidth - 250, 50);
+    .font('Bold')
+    .text('TAX INVOICE', RIGHT_LABEL_X, 50);
 
   /* ---------- ISSUER DETAILS ---------- */
   doc
     .fontSize(10)
-    .font('Helvetica')
-    .text('Issued by:', pageWidth - 250, 100)
-    .font('Helvetica-Bold')
-    .text('ETHMumbai Private Limited', pageWidth - 150, 100)
-    .font('Helvetica')
-    .text('GSTIN:', pageWidth - 250, 118)
-    .text('27AAJCE3338F1ZO', pageWidth - 150, 118)
-    .text('PAN:', pageWidth - 250, 136)
-    .text('AAJCE3338F', pageWidth - 150, 136)
-    .text('Invoice No:', pageWidth - 250, 154)
-    .text(String(data.invoiceNo ?? ''), pageWidth - 150, 154)
-    .text('Date:', pageWidth - 250, 172)
-    .text(String(data.date ?? ''), pageWidth - 150, 172);
+    .font('Bold')
+    .text('Issued by:', RIGHT_LABEL_X, 100)
+    .font('Regular')
+    .text('ETHMumbai Private Limited', RIGHT_VALUE_X, 100)
+    .font('Bold')
+    .text('GSTIN:', RIGHT_LABEL_X, 118)
+    .font('Regular')
+    .text('27AAJCE3338F1ZO', RIGHT_VALUE_X, 118)
+    .font('Bold')
+    .text('PAN:', RIGHT_LABEL_X, 136)
+    .font('Regular')
+    .text('AAJCE3338F', RIGHT_VALUE_X, 136)
+    .font('Bold')
+    .text('Invoice No:', RIGHT_LABEL_X, 154)
+    .font('Regular')
+    .text(String(data.invoiceNo ?? ''), RIGHT_VALUE_X, 154)
+    .font('Bold')
+    .text('Date:', RIGHT_LABEL_X, 172)
+    .font('Regular')
+    .text(String(data.date ?? ''), RIGHT_VALUE_X, 172);
+
 
   /* ---------- BILLED TO ---------- */
   doc
-    .font('Helvetica-Bold')
+    .font('Bold')
     .fontSize(11)
     .text('Billed to:', 50, 110)
-    .font('Helvetica')
+    .font('Regular')
     .text(data.billedTo?.name ?? '', 50, 130)
     .text(data.billedTo?.addressLine1 ?? '', 50, 146)
     .text(
@@ -84,11 +126,11 @@ export function generateInvoicePDF(
     .stroke();
 
   doc
-    .font('Helvetica-Bold')
+    .font('Regular')
     .text('DESCRIPTION', 50, tableTop + 10)
-    .text('QTY', 350, tableTop + 10)
-    .text('PRICE', 420, tableTop + 10)
-    .text('TOTAL', 500, tableTop + 10);
+    .text('QTY', COL_QTY, tableTop + 10)
+    .text('PRICE', COL_PRICE, tableTop + 10)
+    .text('TOTAL', COL_TOTAL, tableTop + 10);
 
   doc
     .moveTo(50, tableTop + 30)
@@ -98,11 +140,11 @@ export function generateInvoicePDF(
   const itemTotal = quantity * price;
 
   doc
-    .font('Helvetica')
-    .text(data.item?.description ?? '', 50, tableTop + 45)
-    .text(String(quantity), 350, tableTop + 45)
-    .text(`INR ${price.toLocaleString()}`, 420, tableTop + 45)
-    .text(`INR ${itemTotal.toLocaleString()}`, 500, tableTop + 45);
+    .font('Regular')
+    .text(`ETHMumbai Conference Ticket - ${data.item?.description ?? ''}`, 50, tableTop + 45)
+    .text(String(quantity), COL_QTY, tableTop + 45)
+    .text(`INR ${price.toLocaleString()}`, COL_PRICE, tableTop + 45)
+    .text(`INR ${itemTotal.toLocaleString()}`, COL_TOTAL, tableTop + 45);
 
   doc
     .moveTo(50, tableTop + 80)
@@ -117,46 +159,73 @@ export function generateInvoicePDF(
   let totalsTop = tableTop + 110;
 
   doc
-    .font('Helvetica')
-    .text('SUB TOTAL', 350, totalsTop)
-    .text(`INR ${itemTotal.toLocaleString()}`, 500, totalsTop)
-    .text('DISCOUNT', 350, totalsTop + 20)
-    .text(`INR ${discount.toLocaleString()}`, 500, totalsTop + 20);
+    .font('Regular')
+    .text('SUB TOTAL', COL_QTY, totalsTop)
+    .text(`INR ${itemTotal.toLocaleString()}`, COL_TOTAL, totalsTop)
+    .text('DISCOUNT', COL_QTY, totalsTop + 20)
+    .text(`INR ${discount.toLocaleString()}`, COL_TOTAL, totalsTop + 20);
 
   doc
-    .moveTo(350, totalsTop + 45)
-    .lineTo(pageWidth - 50, totalsTop + 45)
+    .moveTo(COL_QTY, totalsTop + 45)
+    .lineTo(TABLE_RIGHT_EDGE, totalsTop + 45)
     .stroke();
 
   doc
-    .font('Helvetica-Bold')
-    .text('TOTAL', 350, totalsTop + 60)
-    .text(`INR ${discountedTotal.toLocaleString()}`, 500, totalsTop + 60);
+    .font('Bold')
+    .text('TOTAL', COL_QTY, totalsTop + 60)
+    .text(`INR ${discountedTotal.toLocaleString()}`, COL_TOTAL, totalsTop + 60);
+
 
   /* ---------- GST ---------- */
   let gstTop = totalsTop + 110;
 
   doc
-    .font('Helvetica')
-    .text('EXCLUDING GST', 350, gstTop)
-    .text(`INR ${(discountedTotal - gstAmount).toFixed(2)}`, 500, gstTop)
-    .text('CGST 9%', 350, gstTop + 20)
-    .text(`INR ${gstHalf.toFixed(2)}`, 500, gstTop + 20)
-    .text('SGST 9%', 350, gstTop + 40)
-    .text(`INR ${gstHalf.toFixed(2)}`, 500, gstTop + 40);
+    .font('Regular')
+    .text('EXCLUDING GST', COL_QTY, gstTop)
+    .text(`INR ${(discountedTotal - gstAmount).toFixed(2)}`, COL_TOTAL, gstTop)
+    .text('CGST 9%', COL_QTY, gstTop + 20)
+    .text(`INR ${gstHalf.toFixed(2)}`, COL_TOTAL, gstTop + 20)
+    .text('SGST 9%', COL_QTY, gstTop + 40)
+    .text(`INR ${gstHalf.toFixed(2)}`, COL_TOTAL, gstTop + 40);
 
   /* ---------- FOOTER ---------- */
   doc
-    .font('Helvetica')
-    .text(`Payment Method:\n${data.paymentMethod ?? ''}`, 50, 720);
+    .font('Bold')
+    .text('Payment Method:\n', 50, 700)
+    .font('Regular')
+    .text(`${data.paymentMethod ?? ''}`, 50, 720);
+
+  const RIGHT_SECTION_X = pageWidth - 250 - SHIFT_LEFT;
+  const RIGHT_SECTION_WIDTH = 200; // controls text wrapping
+
 
   doc
-    .font('Helvetica-Bold')
+    .font('Bold')
+    .fillColor('#000000')
+    .fontSize(18)
+    .text(
+      'See you at the\n',
+      RIGHT_SECTION_X,
+      710,
+      {
+        width: RIGHT_SECTION_WIDTH,
+        align: 'right',
+      },
+    );
+    doc
+    .font('Bold')
     .fillColor('#E11D48')
     .fontSize(18)
-    .text('See you at the\nBEST Ethereum\nConference', pageWidth - 250, 710, {
-      align: 'right',
-    });
+    .text(
+      'BEST Ethereum\nConference',
+      RIGHT_SECTION_X,
+      730,
+      {
+        width: RIGHT_SECTION_WIDTH,
+        align: 'right',
+      },
+    );
+
 
   doc.end();
   return doc;
