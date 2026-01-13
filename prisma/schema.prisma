@@ -38,6 +38,7 @@ model Order {
   buyerEmailSent    Boolean           @default(false)
   buyerEmailSentAt  DateTime?
   buyerId           String
+  nvoiceNumber     String?           @unique
   generatedTickets  GeneratedTicket[]
   buyer             Buyer             @relation(fields: [buyerId], references: [id])
   ticket            Ticket            @relation(fields: [ticketId], references: [id])
