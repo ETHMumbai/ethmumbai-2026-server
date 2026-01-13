@@ -359,7 +359,7 @@ export class PaymentsService {
     this.logger.log(`[Razorpay] Payment verified & order marked paid | orderId=${order.id}`);
     this.logger.log(`[Tickets] Generating tickets | orderId=${order.id}`);
     await this.ticketsService.generateTicketsForOrder(order.id);
-
+    //generate Invoice for order
     return verifyResult;
   }
 }

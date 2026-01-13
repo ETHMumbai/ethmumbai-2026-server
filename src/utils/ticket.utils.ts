@@ -6,3 +6,6 @@ export function generateTicketCode(email: string): string {
   const random = Math.random().toString(36).substring(2, 6); // adds randomness
   return `${shortHash}-${random}`.toUpperCase();
 }
+
+//TODO
+//generateInvoice No.

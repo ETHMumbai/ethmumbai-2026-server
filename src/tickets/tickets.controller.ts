@@ -9,6 +9,8 @@ import {
   Param,
   Res,
   InternalServerErrorException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,8 +18,10 @@ import type { Response } from 'express';
 import * as QRCode from 'qrcode';
 // import { generateTicketsForOrder } from ./TicketsService
 import { generateTicketPDF } from './generateTicket';
+import { generateInvoicePDFBuffer, InvoiceData } from '../utils/generateInvoicePdf';
 import PDFDocument from 'pdfkit';
 import * as path from 'path';
+import * as fs from 'fs';
 import { ApiKeyGuard } from '../utils/api-key-auth';
 
 @Controller('t')
@@ -109,4 +113,38 @@ async getCurrentTicket() {
       resp?.buyerName
     );
   }
+
+  @Get("/preview/invoice")
+async previewInvoice(@Res() res: Response) {
+  const invoiceData: InvoiceData = {
+    invoiceNo: "ETHM00899",
+    date: new Date().toDateString(),
+    billedTo: {
+      name: "Tanushree",
+      addressLine1: "Some Street",
+      city: "Kolkata",
+      state: "WB",
+      pincode: "700001",
+    },
+    item: {
+      description: "ETHMumbai Conference Ticket",
+      quantity: 1,
+      price: 4999,
+    },
+    discount: 0,
+    gstRate: 18,
+    paymentMethod: "UPI",
+  };
+
+  const pdfBuffer = await generateInvoicePDFBuffer(invoiceData);
+
+  res.set({
+    "Content-Type": "application/pdf",
+    "Content-Disposition": 'inline; filename="invoice.pdf"',
+    "Content-Length": pdfBuffer.length,
+  });
+
+  res.send(pdfBuffer);
+}
+
 }
