@@ -7,5 +7,10 @@ export function generateTicketCode(email: string): string {
   return `${shortHash}-${random}`.toUpperCase();
 }
 
-//TODO
-//generateInvoice No.
+export function generateInvoiceNumber(orderId: string): string {
+  const randomNumber = Math.floor(Math.random() * 100000);
+
+  const paddedNumber = String(randomNumber).padStart(5, '0');
+
+  return `ETHM${paddedNumber}`;
+}
