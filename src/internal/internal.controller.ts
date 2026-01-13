@@ -14,6 +14,7 @@ import { MailService } from '../mail/mail.service';
 // import { AdminGuard } from 'src/utils/admin.guard';
 import { ApiKeyGuard } from 'src/utils/api-key-auth';
 import { TicketsService } from 'src/tickets/tickets.service';
+import Razorpay from 'razorpay';
 
 @Controller('internal')
 // @UseGuards(AdminGuard)
@@ -21,11 +22,17 @@ import { TicketsService } from 'src/tickets/tickets.service';
 export class InternalController {
   private readonly DAIMO_API_URL = 'https://pay.daimo.com/api/payment';
   private readonly DAIMO_API_KEY = process.env.DAIMO_API_KEY;
+  private razorpay: Razorpay;
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
     private readonly ticketsService: TicketsService,
-  ) {}
+  ) {
+    this.razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
 
   // --- Participants ---
 
@@ -286,6 +293,32 @@ export class InternalController {
       throw new BadRequestException('Order not found');
     }
 
+    let rzpLabel = '';
+
+    if (order.paymentType == 'RAZORPAY' && order.razorpayPaymentId != null) {
+      const payment = await this.razorpay.payments.fetch(
+        order.razorpayPaymentId,
+      );
+
+      // Convert to nice label for UI
+      switch (payment.method) {
+        case 'upi':
+          rzpLabel = 'UPI via Razorpay';
+          break;
+        case 'card':
+          rzpLabel = 'Card via Razorpay';
+          break;
+        case 'netbanking':
+          rzpLabel = 'Netbanking via Razorpay';
+          break;
+        case 'wallet':
+          rzpLabel = 'Razorpay';
+          break;
+        default:
+          rzpLabel = payment.method;
+      }
+    }
+
     return {
       success: true,
       order: {
@@ -295,7 +328,9 @@ export class InternalController {
         ticketType: order.ticket.title,
         quantity: order.participants.length,
         paymentMethod:
-          order.paymentType === 'RAZORPAY' ? 'Razorpay' : 'Crypto',
+          order.paymentType === 'RAZORPAY'
+            ? `INR (${rzpLabel || 'Unknown'})`
+            : 'Crypto',
         purchaseDate: order.createdAt,
         orderFiat: order.ticket.fiat,
         orderCrypto: order.ticket.crypto,
