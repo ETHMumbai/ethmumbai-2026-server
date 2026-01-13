@@ -28,6 +28,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { ApiKeyGuard } from '../utils/api-key-auth';
 import Razorpay from 'razorpay';
+import { generateInvoiceNumberForOrder } from 'src/utils/ticket.utils';
 
 @Controller('t')
 export class TicketsController {
@@ -103,26 +104,6 @@ export class TicketsController {
   // async getTicketCount(@Param('ticketType') ticketType: string) {
   //   return await this.ticketService.getTicketCount();
   // }
-
-  //check-in is happening when this endpoint is hit -> change this to include a button/check that can be used by the team to check-in
-  @UseGuards(ApiKeyGuard)
-  @Get('/:token')
-  async verify(@Param('token') token: string) {
-    const resp = await this.ticketService.verifyAndMark(token);
-    if (resp?.ok == false) {
-      return 'Check-in failed: ' + resp?.reason;
-    }
-    return (
-      'Hi ' +
-      resp?.participantName +
-      ', Welcome to ETHMumbai! You have received the ' +
-      resp?.ticketTypeTitle +
-      ' ETHMumbai Conference ticket with ticket code : ' +
-      token +
-      ' paid for by ' +
-      resp?.buyerName
-    );
-  }
 
   @Get('preview-invoice/:orderId')
   async previewInvoice(
@@ -210,5 +191,45 @@ export class TicketsController {
     });
 
     res.send(pdfBuffer);
+  }
+
+  @Get('invoice')
+  async testGenerateInvoice(
+    @Query('orderId') orderId: string,
+  ) {
+    if (!orderId) {
+      throw new BadRequestException('orderId is required');
+    }
+
+    const invoiceNumber = await generateInvoiceNumberForOrder(
+      this.prisma,
+      orderId,
+    );
+
+    return {
+      success: true,
+      orderId,
+      invoiceNumber,
+    };
+  }
+
+   //check-in is happening when this endpoint is hit -> change this to include a button/check that can be used by the team to check-in
+  @UseGuards(ApiKeyGuard)
+  @Get('/:token')
+  async verify(@Param('token') token: string) {
+    const resp = await this.ticketService.verifyAndMark(token);
+    if (resp?.ok == false) {
+      return 'Check-in failed: ' + resp?.reason;
+    }
+    return (
+      'Hi ' +
+      resp?.participantName +
+      ', Welcome to ETHMumbai! You have received the ' +
+      resp?.ticketTypeTitle +
+      ' ETHMumbai Conference ticket with ticket code : ' +
+      token +
+      ' paid for by ' +
+      resp?.buyerName
+    );
   }
 }

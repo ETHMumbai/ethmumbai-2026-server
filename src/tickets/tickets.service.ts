@@ -324,4 +324,96 @@ export class TicketsService {
       ticketCount: Math.max(ticket.quantity - usedCount.length, 0),
     };
   }
+
+  async generateInvoiceForOrder(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { participants: true },
+    });
+
+    if (!order) throw new NotFoundException('Order not found');
+
+    const ticketQty = order.participants.length;
+
+    const ticket = await this.prisma.ticket.findFirst({
+      where: {
+        isActive: true,
+        remainingQuantity: { gt: 0 },
+      },
+      orderBy: { priority: 'asc' },
+    });
+
+    if (!ticket || ticket.remainingQuantity < ticketQty) {
+      throw new BadRequestException('Tickets sold out');
+    }
+
+    await this.prisma.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        remainingQuantity: {
+          decrement: ticketQty,
+        },
+      },
+    });
+
+    const pdfMap = new Map<string, Buffer>();
+
+    await Promise.all(
+      order.participants.map(async (participant) => {
+        const ticketCode = await this.generateTicketCode();
+
+        const { ticketUrl, qrHash } =
+          await this.generateQRforTicket(ticketCode);
+
+        await this.prisma.generatedTicket.create({
+          data: {
+            ticketCode,
+            participantId: participant.id,
+            qrHash,
+            qrUrl: ticketUrl,
+            orderId: order.id,
+          },
+        });
+
+        // QR AS BUFFER ONLY
+        const qrImageBuffer = await QRCode.toBuffer(ticketUrl, {
+          width: 220,
+          errorCorrectionLevel: 'M',
+        });
+
+        // PDF BUFFER
+        const pdfBuffer = await generateTicketPDFBuffer({
+          name: participant.firstName || 'Participant',
+          ticketId: ticketCode,
+          qrImage: qrImageBuffer,
+        });
+
+        pdfMap.set(ticketCode, pdfBuffer);
+        // convert dataURL → PNG file (example path)
+        // const filePath = `./qr/tickets/${ticketCode}.png`;
+
+        // Get PNG buffer for QR image
+        // getPngBufferFromDataUrl(dataUrl);
+
+        //save QR as PNG
+        // savePngFromDataUrl(dataUrl, filePath);
+
+        //for validation in dev with x-scanner-key
+        console.log(ticketUrl);
+      }),
+    );
+
+    // SEND ALL PARTICIPANT PDFs
+    await this.mailService.sendParticipantEmails(orderId, pdfMap);
+
+    // SEND BUYER CONFIRMATION
+    await this.mailService.sendBuyerEmail(orderId);
+
+    await this.prisma.ticket.update({
+      where: { id: order.ticketId },
+      data: {
+        quantity: { decrement: order.participants.length },
+      },
+    });
+  }
 }

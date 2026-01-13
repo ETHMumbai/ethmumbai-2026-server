@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import { PrismaService } from '../prisma/prisma.service';
 
 export function generateTicketCode(email: string): string {
   const hash = crypto.createHash('sha256').update(email).digest('hex');
@@ -7,10 +8,31 @@ export function generateTicketCode(email: string): string {
   return `${shortHash}-${random}`.toUpperCase();
 }
 
-export function generateInvoiceNumber(orderId: string): string {
-  const randomNumber = Math.floor(Math.random() * 100000);
+export async function generateInvoiceNumberForOrder(
+  prisma: PrismaService,
+  orderId: string,
+): Promise<string> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const count = await prisma.order.count({
+      
+    });
+    console.log('Current invoice count:', count);
 
-  const paddedNumber = String(randomNumber).padStart(5, '0');
+    const invoiceNo = `ETHM${String(count + 1).padStart(5, '0')}`;
 
-  return `ETHM${paddedNumber}`;
+    try {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { invoiceNumber: invoiceNo },
+      });
+
+      return invoiceNo;
+    } catch (err: any) {
+      // Prisma unique constraint error
+      if (err.code !== 'P2002') throw err;
+    }
+  }
+
+  throw new Error('Failed to generate unique invoice number');
 }
+
