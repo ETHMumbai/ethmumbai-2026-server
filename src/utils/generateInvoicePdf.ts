@@ -67,6 +67,9 @@ export function generateInvoicePDF(
   const price = Number(data.item?.price ?? 0);
   const discount = Number(data.discount ?? 0);
   const gstRate = Number(data.gstRate ?? 0);
+  const gstPerTicket = 95.27;
+
+  const actualTicketPrice = 2499; // INR 2,499
 
   /* ---------- HEADER ---------- */
   const logoPath = path.join(__dirname, '../assets/ethmumbai-logo.png');
@@ -137,13 +140,13 @@ export function generateInvoicePDF(
     .lineTo(pageWidth - 50, tableTop + 30)
     .stroke();
 
-  const itemTotal = quantity * price;
+  const itemTotal = quantity * actualTicketPrice;
 
   doc
     .font('Regular')
     .text(`ETHMumbai Conference Ticket - ${data.item?.description ?? ''}`, 50, tableTop + 45)
     .text(String(quantity), COL_QTY, tableTop + 45)
-    .text(`INR ${price.toLocaleString()}`, COL_PRICE, tableTop + 45)
+    .text(`INR ${actualTicketPrice.toLocaleString()}`, COL_PRICE, tableTop + 45)
     .text(`INR ${itemTotal.toLocaleString()}`, COL_TOTAL, tableTop + 45);
 
   doc
@@ -152,9 +155,10 @@ export function generateInvoicePDF(
     .stroke();
 
   /* ---------- TOTALS ---------- */
-  const discountedTotal = itemTotal - discount;
-  const gstAmount = discountedTotal * (gstRate / 100);
-  const gstHalf = gstAmount / 2;
+  const totalDiscount = discount * quantity;
+  const discountedTotal = itemTotal - totalDiscount;
+  
+  const gstAmount = gstPerTicket * quantity;
 
   let totalsTop = tableTop + 110;
 
@@ -184,9 +188,9 @@ export function generateInvoicePDF(
     .text('EXCLUDING GST', COL_QTY, gstTop)
     .text(`INR ${(discountedTotal - gstAmount).toFixed(2)}`, COL_TOTAL, gstTop)
     .text('CGST 9%', COL_QTY, gstTop + 20)
-    .text(`INR ${gstHalf.toFixed(2)}`, COL_TOTAL, gstTop + 20)
+    .text(`INR ${gstAmount.toFixed(2)}`, COL_TOTAL, gstTop + 20)
     .text('SGST 9%', COL_QTY, gstTop + 40)
-    .text(`INR ${gstHalf.toFixed(2)}`, COL_TOTAL, gstTop + 40);
+    .text(`INR ${gstAmount.toFixed(2)}`, COL_TOTAL, gstTop + 40);
 
   /* ---------- FOOTER ---------- */
   doc

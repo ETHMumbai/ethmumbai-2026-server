@@ -16,13 +16,22 @@ import {
 import { generateInvoicePDFBuffer } from 'src/utils/generateInvoicePdf';
 import { generateInvoiceNumberForOrder } from 'src/utils/ticket.utils';
 import { InvoiceData } from '../utils/generateInvoicePdf';
+import Razorpay from 'razorpay';
 
 @Injectable()
 export class TicketsService {
+  // private razorpay: ;
+  private razorpay: Razorpay;
+  
+
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
-  ) { }
+    
+  ) { this.razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });}
 
   private async generateTicketCode(): Promise<string> {
     while (true) {
@@ -59,6 +68,10 @@ export class TicketsService {
       },
       orderBy: { priority: 'asc' },
     });
+
+    if(!ticket?.remainingQuantity) {
+      throw new BadRequestException('Tickets sold out');
+    }
 
     if (!ticket || ticket.remainingQuantity < ticketQty) {
       throw new BadRequestException('Tickets sold out');
@@ -339,6 +352,32 @@ export class TicketsService {
     const address = buyer.address;
     const ticket = order.ticket;
 
+    let rzpLabel = '';
+
+    if (order.paymentType == 'RAZORPAY' && order.razorpayPaymentId != null) {
+      const payment = await this.razorpay.payments.fetch(
+        order.razorpayPaymentId,
+      );
+
+      // Convert to nice label for UI
+      switch (payment.method) {
+        case 'upi':
+          rzpLabel = 'UPI via Razorpay';
+          break;
+        case 'card':
+          rzpLabel = 'Card via Razorpay';
+          break;
+        case 'netbanking':
+          rzpLabel = 'Netbanking via Razorpay';
+          break;
+        case 'wallet':
+          rzpLabel = 'Razorpay';
+          break;
+        default:
+          rzpLabel = payment.method;
+      }
+    }
+
     return {
       invoiceNo: order.invoiceNumber,
       date: order.createdAt.toDateString(),
@@ -354,15 +393,15 @@ export class TicketsService {
       item: {
         description: ticket.title,
         quantity: order.participants.length,
-        price: ticket.fiat,
+        price: ticket.fiat,//1249
       },
 
-      discount: 0,
-      gstRate: 18,
+      discount: 1250,
+      gstRate: 9,
 
       paymentMethod:
         order.paymentType === 'RAZORPAY'
-          ? 'INR (Razorpay)'
+          ? `INR (${rzpLabel || 'Unknown'})`
           : 'Crypto',
     };
   }
