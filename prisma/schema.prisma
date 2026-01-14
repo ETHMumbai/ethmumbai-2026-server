@@ -8,15 +8,15 @@ datasource db {
 }
 
 model Ticket {
-  id                String  @id @default(uuid())
-  title             String  @unique
+  id                String   @id @default(uuid())
+  title             String   @unique
   type              String
-  fiat              Float   @default(999)
-  crypto            Float   @default(12)
+  fiat              Float    @default(999)
+  crypto            Float    @default(12)
   quantity          Int
-  isActive          Boolean @default(true)
-  priority          Int     @default(99)
-  remainingQuantity Int
+  remainingQuantity Int?
+  isActive          Boolean? @default(false)
+  priority          Int?
   orders            Order[]
 }
 
@@ -38,6 +38,7 @@ model Order {
   buyerEmailSent    Boolean           @default(false)
   buyerEmailSentAt  DateTime?
   buyerId           String
+  invoiceNumber     String?           @unique
   generatedTickets  GeneratedTicket[]
   buyer             Buyer             @relation(fields: [buyerId], references: [id])
   ticket            Ticket            @relation(fields: [ticketId], references: [id])
@@ -95,6 +96,11 @@ model GeneratedTicket {
   qrUrl         String?
   order         Order       @relation(fields: [orderId], references: [id])
   participant   Participant @relation(fields: [participantId], references: [id])
+}
+
+model InvoiceCounter {
+  id    Int @id @default(1)
+  last  Int
 }
 
 enum PaymentType {
