@@ -13,13 +13,16 @@ import {
   getPngBufferFromDataUrl,
   savePngFromDataUrl,
 } from 'src/utils/handle-png';
+import { generateInvoicePDFBuffer } from 'src/utils/generateInvoicePdf';
+import { generateInvoiceNumberForOrder } from 'src/utils/ticket.utils';
+import { InvoiceData } from '../utils/generateInvoicePdf';
 
 @Injectable()
 export class TicketsService {
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
-  ) {}
+  ) { }
 
   private async generateTicketCode(): Promise<string> {
     while (true) {
@@ -36,6 +39,8 @@ export class TicketsService {
       if (!exists) return code;
     }
   }
+
+
 
   async generateTicketsForOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
@@ -115,26 +120,28 @@ export class TicketsService {
       }),
     );
 
+    const pdfBufferInvoice =
+      await this.generateInvoiceForOrder(orderId);
+
     // SEND ALL PARTICIPANT PDFs
     await this.mailService.sendParticipantEmails(orderId, pdfMap);
 
     // SEND BUYER CONFIRMATION
-    await this.mailService.sendBuyerEmail(orderId);
+    await this.mailService.sendBuyerEmail(orderId, pdfBufferInvoice);
 
-    await this.prisma.ticket.update({
-      where: { id: order.ticketId },
-      data: {
-        quantity: { decrement: order.participants.length },
-      },
-    });
+    // await this.prisma.ticket.update({
+    //   where: { id: order.ticketId },
+    //   data: {
+    //     quantity: { decrement: order.participants.length },
+    //   },
+    // });
   }
 
   async generateQRforTicket(ticketCode: string) {
     const qrHash = crypto.createHash('sha256').update(ticketCode).digest('hex');
 
-    const ticketUrl = `${
-      process.env.APP_BASE_URL || 'https://www.ethmumbai.in'
-    }/t/${ticketCode}`;
+    const ticketUrl = `${process.env.APP_BASE_URL || 'https://www.ethmumbai.in'
+      }/t/${ticketCode}`;
 
     return { ticketUrl, qrHash };
   }
@@ -325,95 +332,68 @@ export class TicketsService {
     };
   }
 
+  private async buildInvoiceData(
+    order: any, // Prisma order with includes
+  ): Promise<InvoiceData> {
+    const buyer = order.buyer;
+    const address = buyer.address;
+    const ticket = order.ticket;
+
+    return {
+      invoiceNo: order.invoiceNumber,
+      date: order.createdAt.toDateString(),
+
+      billedTo: {
+        name: `${buyer.firstName} ${buyer.lastName}`,
+        addressLine1: address?.line1 || '',
+        city: address?.city || '',
+        state: address?.state || '',
+        pincode: address?.postalCode || '',
+      },
+
+      item: {
+        description: ticket.title,
+        quantity: order.participants.length,
+        price: ticket.fiat,
+      },
+
+      discount: 0,
+      gstRate: 18,
+
+      paymentMethod:
+        order.paymentType === 'RAZORPAY'
+          ? 'INR (Razorpay)'
+          : 'Crypto',
+    };
+  }
+
   async generateInvoiceForOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { participants: true },
+      include: {
+        buyer: { include: { address: true } },
+        ticket: true,
+        participants: true,
+      },
     });
 
     if (!order) throw new NotFoundException('Order not found');
 
-    const ticketQty = order.participants.length;
-
-    const ticket = await this.prisma.ticket.findFirst({
-      where: {
-        isActive: true,
-        remainingQuantity: { gt: 0 },
-      },
-      orderBy: { priority: 'asc' },
-    });
-
-    if (!ticket || ticket.remainingQuantity < ticketQty) {
-      throw new BadRequestException('Tickets sold out');
+    if (order.invoiceNumber) {
+      const invoiceData = await this.buildInvoiceData(order);
+      return generateInvoicePDFBuffer(invoiceData);
     }
 
-    await this.prisma.ticket.update({
-      where: { id: ticket.id },
-      data: {
-        remainingQuantity: {
-          decrement: ticketQty,
-        },
-      },
-    });
-
-    const pdfMap = new Map<string, Buffer>();
-
-    await Promise.all(
-      order.participants.map(async (participant) => {
-        const ticketCode = await this.generateTicketCode();
-
-        const { ticketUrl, qrHash } =
-          await this.generateQRforTicket(ticketCode);
-
-        await this.prisma.generatedTicket.create({
-          data: {
-            ticketCode,
-            participantId: participant.id,
-            qrHash,
-            qrUrl: ticketUrl,
-            orderId: order.id,
-          },
-        });
-
-        // QR AS BUFFER ONLY
-        const qrImageBuffer = await QRCode.toBuffer(ticketUrl, {
-          width: 220,
-          errorCorrectionLevel: 'M',
-        });
-
-        // PDF BUFFER
-        const pdfBuffer = await generateTicketPDFBuffer({
-          name: participant.firstName || 'Participant',
-          ticketId: ticketCode,
-          qrImage: qrImageBuffer,
-        });
-
-        pdfMap.set(ticketCode, pdfBuffer);
-        // convert dataURL → PNG file (example path)
-        // const filePath = `./qr/tickets/${ticketCode}.png`;
-
-        // Get PNG buffer for QR image
-        // getPngBufferFromDataUrl(dataUrl);
-
-        //save QR as PNG
-        // savePngFromDataUrl(dataUrl, filePath);
-
-        //for validation in dev with x-scanner-key
-        console.log(ticketUrl);
-      }),
+    const invoiceNo = await generateInvoiceNumberForOrder(
+      this.prisma,
+      orderId,
     );
 
-    // SEND ALL PARTICIPANT PDFs
-    await this.mailService.sendParticipantEmails(orderId, pdfMap);
-
-    // SEND BUYER CONFIRMATION
-    await this.mailService.sendBuyerEmail(orderId);
-
-    await this.prisma.ticket.update({
-      where: { id: order.ticketId },
-      data: {
-        quantity: { decrement: order.participants.length },
-      },
+    const invoiceData = await this.buildInvoiceData({
+      ...order,
+      invoiceNumber: invoiceNo,
     });
+
+    return generateInvoicePDFBuffer(invoiceData);
   }
 }

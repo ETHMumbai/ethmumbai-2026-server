@@ -16,7 +16,10 @@ export class MailService {
   // ---------------------------------------------
   // BUYER CONFIRMATION EMAIL
   // ---------------------------------------------
-  async sendBuyerEmail(orderId: string) {
+  async sendBuyerEmail(
+    orderId: string,
+    pdfBuffer: Buffer, // Invoice PDF buffer
+  ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -27,6 +30,11 @@ export class MailService {
 
     if (!order) {
       this.logger.error(`Order not found: ${orderId}`);
+      return;
+    }
+
+    if (order.buyerEmailSent) {
+      this.logger.warn(`Buyer email already sent for ${order.id}`);
       return;
     }
 
@@ -43,6 +51,12 @@ export class MailService {
       )
       .join('\n');
 
+    const attachment = {
+      filename: `ETHMumbai-Invoice-${order.invoiceNumber}.pdf`,
+      contentType: 'application/pdf',
+      data: pdfBuffer.toString('base64'),
+    };
+
     const resp = await this.loops.sendTransactionalEmail(
       BUYER_TEMPLATE,
       order.buyer.email,
@@ -55,6 +69,7 @@ export class MailService {
         status: order.status,
         participantsList,
       },
+      [attachment],
     );
 
     if (!resp?.success) {
