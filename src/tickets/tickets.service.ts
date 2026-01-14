@@ -13,13 +13,25 @@ import {
   getPngBufferFromDataUrl,
   savePngFromDataUrl,
 } from 'src/utils/handle-png';
+import { generateInvoicePDFBuffer } from 'src/utils/generateInvoicePdf';
+import { generateInvoiceNumberForOrder } from 'src/utils/ticket.utils';
+import { InvoiceData } from '../utils/generateInvoicePdf';
+import Razorpay from 'razorpay';
 
 @Injectable()
 export class TicketsService {
+  // private razorpay: ;
+  private razorpay: Razorpay;
+  
+
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
-  ) {}
+    
+  ) { this.razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });}
 
   private async generateTicketCode(): Promise<string> {
     while (true) {
@@ -36,6 +48,8 @@ export class TicketsService {
       if (!exists) return code;
     }
   }
+
+
 
   async generateTicketsForOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
@@ -54,6 +68,10 @@ export class TicketsService {
       },
       orderBy: { priority: 'asc' },
     });
+
+    if(!ticket?.remainingQuantity) {
+      throw new BadRequestException('Tickets sold out');
+    }
 
     if (!ticket || ticket.remainingQuantity < ticketQty) {
       throw new BadRequestException('Tickets sold out');
@@ -115,26 +133,32 @@ export class TicketsService {
       }),
     );
 
+    const pdfBufferInvoice =
+      await this.generateInvoiceForOrder(orderId);
+
     // SEND ALL PARTICIPANT PDFs
     await this.mailService.sendParticipantEmails(orderId, pdfMap);
 
     // SEND BUYER CONFIRMATION
-    await this.mailService.sendBuyerEmail(orderId);
+    if (order.paymentType === 'RAZORPAY') {
+      await this.mailService.sendBuyerEmail(orderId, pdfBufferInvoice);
+    } else {
+      await this.mailService.sendBuyerCryptoEmail(orderId);
+    }
 
-    await this.prisma.ticket.update({
-      where: { id: order.ticketId },
-      data: {
-        quantity: { decrement: order.participants.length },
-      },
-    });
+    // await this.prisma.ticket.update({
+    //   where: { id: order.ticketId },
+    //   data: {
+    //     quantity: { decrement: order.participants.length },
+    //   },
+    // });
   }
 
   async generateQRforTicket(ticketCode: string) {
     const qrHash = crypto.createHash('sha256').update(ticketCode).digest('hex');
 
-    const ticketUrl = `${
-      process.env.APP_BASE_URL || 'https://www.ethmumbai.in'
-    }/t/${ticketCode}`;
+    const ticketUrl = `${process.env.APP_BASE_URL || 'https://www.ethmumbai.in'
+      }/t/${ticketCode}`;
 
     return { ticketUrl, qrHash };
   }
@@ -323,5 +347,96 @@ export class TicketsService {
     return {
       ticketCount: Math.max(ticket.quantity - usedCount.length, 0),
     };
+  }
+
+  private async buildInvoiceData(
+    order: any, // Prisma order with includes
+  ): Promise<InvoiceData> {
+    const buyer = order.buyer;
+    const address = buyer.address;
+    const ticket = order.ticket;
+
+    let rzpLabel = '';
+
+    if (order.paymentType == 'RAZORPAY' && order.razorpayPaymentId != null) {
+      const payment = await this.razorpay.payments.fetch(
+        order.razorpayPaymentId,
+      );
+
+      // Convert to nice label for UI
+      switch (payment.method) {
+        case 'upi':
+          rzpLabel = 'UPI via Razorpay';
+          break;
+        case 'card':
+          rzpLabel = 'Card via Razorpay';
+          break;
+        case 'netbanking':
+          rzpLabel = 'Netbanking via Razorpay';
+          break;
+        case 'wallet':
+          rzpLabel = 'Razorpay';
+          break;
+        default:
+          rzpLabel = payment.method;
+      }
+    }
+
+    return {
+      invoiceNo: order.invoiceNumber,
+      date: order.createdAt.toDateString(),
+
+      billedTo: {
+        name: `${buyer.firstName} ${buyer.lastName}`,
+        addressLine1: address?.line1 || '',
+        city: address?.city || '',
+        state: address?.state || '',
+        pincode: address?.postalCode || '',
+      },
+
+      item: {
+        description: ticket.title,
+        quantity: order.participants.length,
+        price: ticket.fiat,//1249
+      },
+
+      discount: 1250,
+      gstRate: 9,
+
+      paymentMethod:
+        order.paymentType === 'RAZORPAY'
+          ? `INR (${rzpLabel || 'Unknown'})`
+          : 'Crypto',
+    };
+  }
+
+  async generateInvoiceForOrder(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        buyer: { include: { address: true } },
+        ticket: true,
+        participants: true,
+      },
+    });
+
+    if (!order) throw new NotFoundException('Order not found');
+
+    if (order.invoiceNumber) {
+      const invoiceData = await this.buildInvoiceData(order);
+      return generateInvoicePDFBuffer(invoiceData);
+    }
+
+    const invoiceNo = await generateInvoiceNumberForOrder(
+      this.prisma,
+      orderId,
+    );
+
+    const invoiceData = await this.buildInvoiceData({
+      ...order,
+      invoiceNumber: invoiceNo,
+    });
+
+    return generateInvoicePDFBuffer(invoiceData);
   }
 }

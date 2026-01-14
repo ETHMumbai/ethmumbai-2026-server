@@ -244,11 +244,11 @@ export class InternalController {
   }
 
   // --- Emails ---
-  @Post('email/buyer/:orderId')
-  async resendBuyerEmail(@Param('orderId') orderId: string) {
-    await this.mailService.sendBuyerEmail(orderId);
-    return { success: true, message: 'Buyer email resent' };
-  }
+  // @Post('email/buyer/:orderId')
+  // async resendBuyerEmail(@Param('orderId') orderId: string) {
+  //   await this.mailService.sendBuyerEmail(orderId);
+  //   return { success: true, message: 'Buyer email resent' };
+  // }
 
   // @Post('email/participants/:orderId')
   // async resendParticipantEmails(@Param('orderId') orderId: string) {

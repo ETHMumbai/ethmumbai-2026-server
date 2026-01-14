@@ -16,7 +16,10 @@ export class MailService {
   // ---------------------------------------------
   // BUYER CONFIRMATION EMAIL
   // ---------------------------------------------
-  async sendBuyerEmail(orderId: string) {
+  async sendBuyerEmail(
+    orderId: string,
+    pdfBuffer: Buffer, // Invoice PDF buffer
+  ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -27,6 +30,81 @@ export class MailService {
 
     if (!order) {
       this.logger.error(`Order not found: ${orderId}`);
+      return;
+    }
+
+    if (order.buyerEmailSent) {
+      this.logger.warn(`Buyer email already sent for ${order.id}`);
+      return;
+    }
+
+    const BUYER_TEMPLATE = process.env.LOOPS_BUYER_EMAIL_ID;
+    if (!BUYER_TEMPLATE) {
+      this.logger.error('Missing env: LOOPS_BUYER_EMAIL_ID');
+      return;
+    }
+
+    const participantsList = order.participants
+      .map(
+        (p) =>
+          `${p.firstName} (${p.email}) - Ticket: ${p.generatedTicket?.ticketCode ?? 'Pending'}`,
+      )
+      .join('\n');
+
+    const attachment = {
+      filename: `ETHMumbai-Invoice-${order.invoiceNumber}.pdf`,
+      contentType: 'application/pdf',
+      data: pdfBuffer.toString('base64'),
+    };
+
+    const resp = await this.loops.sendTransactionalEmail(
+      BUYER_TEMPLATE,
+      order.buyer.email,
+      {
+        buyerName: order.buyer.firstName,
+        orderId: order.id,
+        paymentId: order.razorpayPaymentId ?? order.daimoPaymentId ?? 'N/A',
+        amount: order.amount.toString(),
+        currency: order.currency,
+        status: order.status,
+        participantsList,
+      },
+      [attachment],
+    );
+
+    if (!resp?.success) {
+      this.logger.error(
+        `Failed to send buyer confirmation → ${order.buyer.email}`,
+      );
+      return;
+    }
+
+    await this.prisma.order.update({
+      where: { id: order.id },
+      data: { buyerEmailSent: true, buyerEmailSentAt: new Date() },
+    });
+
+    this.logger.log(`Buyer email sent → ${order.buyer.email}`);
+  }
+
+  async sendBuyerCryptoEmail(
+    orderId: string,
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        buyer: true,
+        participants: { include: { generatedTicket: true } },
+      },
+    });
+
+    if (!order) {
+      this.logger.error(`Order not found: ${orderId}`);
+      return;
+    }
+
+    if (order.buyerEmailSent) {
+      this.logger.warn(`Buyer email already sent for ${order.id}`);
       return;
     }
 
