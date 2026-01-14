@@ -98,6 +98,12 @@ model GeneratedTicket {
   participant   Participant @relation(fields: [participantId], references: [id])
 }
 
+model InvoiceCounter {
+  id    Int @id @default(1)
+  last  Int
+}
+
+
 enum PaymentType {
   RAZORPAY
   DAIMO

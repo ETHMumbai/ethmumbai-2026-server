@@ -193,27 +193,25 @@ export class TicketsController {
     res.send(pdfBuffer);
   }
 
-  // @Get('invoice/generate/:orderId')
-  // async generateInvoice(
-  //   @Param('orderId') orderId: string,
-  //   @Res() res: Response,
-  // ) {
-  //   if (!orderId) {
-  //     throw new BadRequestException('orderId is required');
-  //   }
+  @Get('invoice/generate/:orderId')
+  async generateInvoice(
+    @Param('orderId') orderId: string,
+    @Res() res: Response,
+  ) {
+    if (!orderId) {
+      throw new BadRequestException('orderId is required');
+    }
 
-  //   const pdfBuffer =
-  //     await this.ticketService.generateInvoiceForOrder(orderId);
+    const pdfBuffer = await this.ticketService.generateInvoiceForOrder(orderId);
 
-  //   res.set({
-  //     'Content-Type': 'application/pdf',
-  //     'Content-Disposition': `inline; filename="invoice-${orderId}.pdf"`,
-  //     'Content-Length': pdfBuffer.length,
-  //   });
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="invoice-${orderId}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    });
 
-  //   res.send(pdfBuffer);
-  // }
-
+    res.send(pdfBuffer);
+  }
 
   //check-in is happening when this endpoint is hit -> change this to include a button/check that can be used by the team to check-in
   @UseGuards(ApiKeyGuard)

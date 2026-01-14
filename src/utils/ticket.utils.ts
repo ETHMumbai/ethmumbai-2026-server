@@ -12,27 +12,21 @@ export async function generateInvoiceNumberForOrder(
   prisma: PrismaService,
   orderId: string,
 ): Promise<string> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const count = await prisma.order.count({
-      
+  return prisma.$transaction(async (tx) => {
+    // Step 1: Atomically increment counter
+    const counter = await tx.invoiceCounter.update({
+      where: { id: 1 },
+      data: { last: { increment: 1 } },
     });
-    console.log('Current invoice count:', count);
 
-    const invoiceNo = `ETHM${String(count + 1).padStart(5, '0')}`;
+    const invoiceNo = `ETHM${String(counter.last).padStart(5, '0')}`;
 
-    try {
-      await prisma.order.update({
-        where: { id: orderId },
-        data: { invoiceNumber: invoiceNo },
-      });
+    // Step 2: Attach invoice to order
+    await tx.order.update({
+      where: { id: orderId },
+      data: { invoiceNumber: invoiceNo },
+    });
 
-      return invoiceNo;
-    } catch (err: any) {
-      // Prisma unique constraint error
-      if (err.code !== 'P2002') throw err;
-    }
-  }
-
-  throw new Error('Failed to generate unique invoice number');
+    return invoiceNo;
+  });
 }
-
