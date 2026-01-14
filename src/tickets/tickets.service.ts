@@ -140,7 +140,11 @@ export class TicketsService {
     await this.mailService.sendParticipantEmails(orderId, pdfMap);
 
     // SEND BUYER CONFIRMATION
-    await this.mailService.sendBuyerEmail(orderId, pdfBufferInvoice);
+    if (order.paymentType === 'RAZORPAY') {
+      await this.mailService.sendBuyerEmail(orderId, pdfBufferInvoice);
+    } else {
+      await this.mailService.sendBuyerCryptoEmail(orderId);
+    }
 
     // await this.prisma.ticket.update({
     //   where: { id: order.ticketId },
