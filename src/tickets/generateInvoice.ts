@@ -66,7 +66,7 @@ export class InvoiceService {
         price: ticket.fiat,
       },
 
-      discount: 0,
+      discount: 1250,
       gstRate: 18,
 
       paymentMethod:
