@@ -8,15 +8,15 @@ datasource db {
 }
 
 model Ticket {
-  id                String  @id @default(uuid())
-  title             String  @unique
+  id                String   @id @default(uuid())
+  title             String   @unique
   type              String
-  fiat              Float   @default(999)
-  crypto            Float   @default(12)
+  fiat              Float    @default(999)
+  crypto            Float    @default(12)
   quantity          Int
-  isActive          Boolean @default(true)
-  priority          Int     @default(99)
-  remainingQuantity Int
+  remainingQuantity Int?
+  isActive          Boolean? @default(false)
+  priority          Int?
   orders            Order[]
 }
 
@@ -102,7 +102,6 @@ model InvoiceCounter {
   id    Int @id @default(1)
   last  Int
 }
-
 
 enum PaymentType {
   RAZORPAY
