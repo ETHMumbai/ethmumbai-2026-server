@@ -167,7 +167,7 @@ export function generateInvoicePDF(
     .text('SUB TOTAL', COL_QTY, totalsTop)
     .text(`INR ${itemTotal.toLocaleString()}`, COL_TOTAL, totalsTop)
     .text('DISCOUNT', COL_QTY, totalsTop + 20)
-    .text(`INR ${discount.toLocaleString()}`, COL_TOTAL, totalsTop + 20);
+    .text(`INR ${totalDiscount.toLocaleString()}`, COL_TOTAL, totalsTop + 20);
 
   doc
     .moveTo(COL_QTY, totalsTop + 45)
