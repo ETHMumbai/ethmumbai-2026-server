@@ -28,7 +28,7 @@ export class PaymentsService {
     );
 
     const ticket = await this.prisma.ticket.findFirst({
-      where: { type: ticketType },
+      where: { title: ticketType },
     });
 
     if (!ticket) {
@@ -174,7 +174,7 @@ export class PaymentsService {
     this.logger.log(`[Daimo] Creating order | ticketType=${ticketType} | qty=${quantity}`);
 
     const ticket = await this.prisma.ticket.findFirst({
-      where: { type: ticketType },
+      where: { title: ticketType },
     });
     if (!ticket) {
       this.logger.error('[Daimo] Ticket not found');
