@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { getDiscount } from '../utils/discount';
 import type { Response } from 'express';
 import * as QRCode from 'qrcode';
 // import { generateTicketsForOrder } from ./TicketsService
@@ -45,27 +46,24 @@ export class TicketsController {
 
   @Get('/current')
   async getCurrentTicket() {
-    try {
-      const ticket = await this.prisma.ticket.findFirst({
-        where: {
-          isActive: true,
-          remainingQuantity: { gt: 0 },
-        },
-        orderBy: { priority: 'asc' },
-      });
+    const ticket = await this.prisma.ticket.findFirst({
+      where: {
+        isActive: true,
+        remainingQuantity: { gt: 0 },
+      },
+      orderBy: { priority: 'asc' },
+    });
 
-      if (!ticket) {
-        console.log('[DEBUG] No active tickets found.');
-        return { message: 'No active tickets available.' };
-      }
-
-      // console.log('[DEBUG] Current active ticket:', ticket);
-      return ticket;
-    } catch (error) {
-      console.error('[ERROR] Failed to fetch current ticket:', error);
-      throw new InternalServerErrorException('Could not fetch current ticket');
+    if (!ticket) {
+      return { message: 'No active tickets available.' };
     }
+
+    return {
+      ...ticket,
+      discount: getDiscount(ticket.fiat),
+    };
   }
+
 
   @Get('/preview/pdf')
   async previewTicketPdf(
