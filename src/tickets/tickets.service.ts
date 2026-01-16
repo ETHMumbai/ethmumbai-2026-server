@@ -17,6 +17,7 @@ import { generateInvoicePDFBuffer } from 'src/utils/generateInvoicePdf';
 import { generateInvoiceNumberForOrder } from 'src/utils/ticket.utils';
 import { InvoiceData } from '../utils/generateInvoicePdf';
 import Razorpay from 'razorpay';
+import { getDiscount } from 'src/utils/discount';
 
 @Injectable()
 export class TicketsService {
@@ -382,6 +383,9 @@ export class TicketsService {
       }
     }
 
+    const ticketInfo = await this.getCurrentTicketForInvoice();
+    const quantity = order.participants.length;
+
     return {
       invoiceNo: order.invoiceNumber,
       date: order.createdAt.toDateString(),
@@ -400,8 +404,12 @@ export class TicketsService {
         price: ticket.fiat,//1249
       },
 
-      discount: 1250,
+      discount: ticketInfo.discount.amount,
       gstRate: 9,
+
+      excludingGstCost: ticketInfo.excludingGstCost,
+      cgst: ticketInfo.cgst,
+      sgst: ticketInfo.sgst,
 
       paymentMethod:
         order.paymentType === 'RAZORPAY'
@@ -439,4 +447,52 @@ export class TicketsService {
 
     return generateInvoicePDFBuffer(invoiceData);
   }
+
+  async getCurrentTicketForInvoice() {
+  const ticket = await this.prisma.ticket.findFirst({
+    where: {
+      isActive: true,
+      remainingQuantity: { gt: 0 },
+    },
+    orderBy: { priority: 'asc' },
+  });
+
+  if (!ticket) {
+    throw new NotFoundException('No active tickets available.');
+  }
+
+  const discount = getDiscount(ticket.fiat); // e.g., { amount, percentage, originalPrice }
+  const discountedPrice = ticket.fiat; // price after discount
+
+  // Default values
+  let excludingGstCost = 0;
+  let cgst = 0;
+  let sgst = 0;
+
+  // Set values based on discount percentage
+  if (discount.percentage === 50) {
+    excludingGstCost = 1153.73;
+    cgst = 95.27;
+    sgst = 95.27;
+  } else if (discount.percentage === 40) {
+    excludingGstCost = 1270.3;
+    cgst = 114.35;
+    sgst = 114.35;
+  } else {
+    // fallback if other discount percentage
+    excludingGstCost = 1270.3;
+    cgst = 114.35;
+    sgst = 114.35;
+  }
+
+  return {
+    ...ticket,
+    discount,
+    excludingGstCost,
+    cgst,
+    sgst,
+  };
+}
+
+
 }

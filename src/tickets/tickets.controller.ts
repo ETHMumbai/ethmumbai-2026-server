@@ -44,6 +44,54 @@ export class TicketsController {
     });
   }
 
+  @Get('/currentInvoiceTicket')
+  async getCurrentTicketForInvoice() {
+    const ticket = await this.prisma.ticket.findFirst({
+      where: {
+        isActive: true,
+        remainingQuantity: { gt: 0 },
+      },
+      orderBy: { priority: 'asc' },
+    });
+  
+    if (!ticket) {
+      return { message: 'No active tickets available.' };
+    }
+  
+    const discount = getDiscount(ticket.fiat); // e.g., { amount, percentage, originalPrice }
+    const discountedPrice = ticket.fiat; // price after discount
+  
+    // Default values
+    let excludingGstCost = 0;
+    let cgst = 0;
+    let sgst = 0;
+  
+    // Set values based on discount percentage
+    if (discount.percentage === 50) {
+      excludingGstCost = 1153.73;
+      cgst = 95.27;
+      sgst = 95.27;
+    } else if (discount.percentage === 40) {
+      excludingGstCost = 1270.3;
+      cgst = 114.35;
+      sgst = 114.35;
+    } else {
+      // fallback if other discount percentage
+      excludingGstCost = 1270.3;
+      cgst = 114.35;
+      sgst = 114.35;
+    }
+  
+    return {
+      ...ticket,
+      discount,
+      excludingGstCost,
+      cgst,
+      sgst,
+    };
+  }
+  
+
   @Get('/current')
   async getCurrentTicket() {
     const ticket = await this.prisma.ticket.findFirst({

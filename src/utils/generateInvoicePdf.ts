@@ -20,6 +20,9 @@ export interface InvoiceData {
   discount: number;
   gstRate: number; // e.g. 18
   paymentMethod: string;
+  excludingGstCost?: number;
+  cgst?: number;
+  sgst?: number;
 }
 
 export function generateInvoicePDF(
@@ -64,10 +67,10 @@ export function generateInvoicePDF(
 
   // ✅ SAFE NORMALIZATION
   const quantity = Number(data.item?.quantity ?? 1);
-  const price = Number(data.item?.price ?? 0);
+  // const price = Number(data.item?.price ?? 0);
   const discount = Number(data.discount ?? 0);
-  const gstRate = Number(data.gstRate ?? 0);
-  const gstPerTicket = 95.27;
+  // const gstRate = Number(data.gstRate ?? 0);
+  // const gstPerTicket = 95.27;
 
   const actualTicketPrice = 2499; // INR 2,499
 
@@ -157,8 +160,7 @@ export function generateInvoicePDF(
   /* ---------- TOTALS ---------- */
   const totalDiscount = discount * quantity;
   const discountedTotal = itemTotal - totalDiscount;
-  
-  const gstAmount = gstPerTicket * quantity;
+
 
   let totalsTop = tableTop + 110;
 
@@ -183,14 +185,22 @@ export function generateInvoicePDF(
   /* ---------- GST ---------- */
   let gstTop = totalsTop + 110;
 
+  // ensure excludingGstCost is a number (fallback to 0 if undefined)
+  const excludingGst = Number(data.excludingGstCost ?? 0);
+  const totalExludingGst = excludingGst * quantity; 
+  const cgst = Number(data.cgst ?? 0);
+  const totalCgst = cgst * quantity;
+  const sgst = Number(data.sgst ?? 0);
+  const totalSgst = sgst * quantity;
+
   doc
     .font('Regular')
     .text('EXCLUDING GST', COL_QTY, gstTop)
-    .text(`INR ${(discountedTotal - gstAmount).toFixed(2)}`, COL_TOTAL, gstTop)
+    .text(`INR ${totalExludingGst.toFixed(2)}`, COL_TOTAL, gstTop)
     .text('CGST 9%', COL_QTY, gstTop + 20)
-    .text(`INR ${gstAmount.toFixed(2)}`, COL_TOTAL, gstTop + 20)
+    .text(`INR ${totalCgst.toFixed(2)}`, COL_TOTAL, gstTop + 20)
     .text('SGST 9%', COL_QTY, gstTop + 40)
-    .text(`INR ${gstAmount.toFixed(2)}`, COL_TOTAL, gstTop + 40);
+    .text(`INR ${totalSgst.toFixed(2)}`, COL_TOTAL, gstTop + 40);
 
   /* ---------- FOOTER ---------- */
   doc
