@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoopsService } from './loops.service';
-import { Ticket } from 'generated/prisma';
+// import { Ticket } from 'generated/prisma';
 import { TicketsService } from 'src/tickets/tickets.service';
 
 @Injectable()
@@ -14,7 +14,7 @@ export class MailService {
     private prisma: PrismaService,
     private loops: LoopsService,
     private ticketService: TicketsService,
-  ) { }
+  ) {}
 
   // ---------------------------------------------
   // BUYER CONFIRMATION EMAIL
@@ -90,9 +90,7 @@ export class MailService {
     this.logger.log(`Buyer email sent → ${order.buyer.email}`);
   }
 
-  async sendBuyerCryptoEmail(
-    orderId: string,
-  ) {
+  async sendBuyerCryptoEmail(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -220,9 +218,7 @@ export class MailService {
     }
   }
 
-  async sendParticipantEmailsWithPng(
-    email: string,
-  ) {
+  async sendParticipantEmailsWithPng(email: string) {
     const participant = await this.prisma.participant.findFirst({
       where: { emailSent: false },
       include: { generatedTicket: true, order: true },
@@ -243,14 +239,20 @@ export class MailService {
 
     const ticketCode = participant.generatedTicket?.ticketCode;
     if (!ticketCode) {
-      this.logger.error(`No ticket code found for participant with email: ${email}`);
+      this.logger.error(
+        `No ticket code found for participant with email: ${email}`,
+      );
       return;
     }
 
+    if (!participant.firstName) {
+      throw new BadRequestException('Missing firstName (f) parameter');
+    }
+
     const pngBuffer = (await this.ticketService.visualTicketGeneration(
-        ticketType,
-        participant.firstName,
-      )) as Buffer | undefined;
+      ticketType,
+      participant.firstName,
+    )) as Buffer | undefined;
 
     if (!pngBuffer) {
       this.logger.error(`Failed generating PNG for ticket ${ticketCode}`);
@@ -333,5 +335,4 @@ export class MailService {
 
     this.logger.log(`Ticket PDF sent → ${email}`);
   }
-
 }

@@ -335,6 +335,7 @@ export class InternalController {
         orderId: order.id,
         transactionId: order.razorpayPaymentId || order.daimoPaymentId || 'N/A',
         status: order.status,
+        ticketTitle: order.ticket.title,
         ticketType: order.ticket.type,
         quantity: order.participants.length,
         paymentMethod:

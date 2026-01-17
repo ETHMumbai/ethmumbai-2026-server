@@ -331,11 +331,7 @@ export class TicketsService {
     }
   }
 
-  async visualTicketGeneration(
-    ticketType: string,
-    firstName: string,
-    res: Response,
-  ) {
+  async visualTicketGeneration(ticketType: string, firstName: string) {
     if (!firstName) {
       throw new BadRequestException('Missing firstName (f) parameter');
     }
@@ -360,7 +356,7 @@ export class TicketsService {
 
     // OPTIONAL: use a PNG template
     const bgPath =
-      ticketType == 'earlybird'
+      ticketType === 'earlybird'
         ? path.join(__dirname, '../assets/visual/early-bird-ticket.png')
         : path.join(__dirname, '../assets/visual/regular-ticket.png');
 
@@ -384,13 +380,14 @@ export class TicketsService {
     ctx.fillText(firstName, x, y);
 
     // Send PNG response
-    res.set({
-      'Content-Type': 'image/png',
-      'Content-Disposition': 'attachment; filename="ticket.png"',
-      'Cache-Control': 'public, max-age=31536000, immutable',
-    });
+    // res.set({
+    //   'Content-Type': 'image/png',
+    //   'Content-Disposition': 'attachment; filename="ticket.png"',
+    //   'Cache-Control': 'public, max-age=31536000, immutable',
+    // });
 
-    canvas.createPNGStream().pipe(res);
+    // canvas.createPNGStream().pipe(res);
+    return canvas.toBuffer('image/png');
   }
 
   async getTicketCount(ticketType: string) {

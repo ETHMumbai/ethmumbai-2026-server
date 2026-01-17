@@ -149,9 +149,8 @@ export class TicketsController {
   async visualTicket(
     @Param('ticketType') ticketType: string,
     @Query('firstName') firstName: string,
-    @Res() res: Response,
   ) {
-    await this.ticketService.visualTicketGeneration(ticketType, firstName, res);
+    await this.ticketService.visualTicketGeneration(ticketType, firstName);
     // if (!firstName) {
     //   throw new BadRequestException('Missing firstName (f) parameter');
     // }
