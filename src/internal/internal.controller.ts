@@ -7,6 +7,8 @@ import {
   BadRequestException,
   Query,
   Body,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,6 +17,9 @@ import { MailService } from '../mail/mail.service';
 import { ApiKeyGuard } from 'src/utils/api-key-auth';
 import { TicketsService } from 'src/tickets/tickets.service';
 import Razorpay from 'razorpay';
+import path from 'path';
+import { createCanvas, loadImage, registerFont } from 'canvas';
+import { Response } from 'express';
 
 @Controller('internal')
 // @UseGuards(AdminGuard)
@@ -530,5 +535,68 @@ export class InternalController {
       firstName: body.firstName,
       email: body.email,
     });
+  }
+
+  @Get('social/hacker')
+  async hackerSocialGeneration(@Query('firstName') firstName: string) {
+    if (!firstName) {
+      throw new BadRequestException('Missing firstName (f) parameter');
+    }
+
+    const fontPath = path.join(
+      __dirname,
+      '../assets/fonts/MPLUSRounded1c-ExtraBold.ttf',
+    );
+
+    registerFont(fontPath, {
+      family: 'M PLUS Rounded 1c',
+      weight: '700',
+    });
+
+    console.log(fontPath);
+
+    const width = 1920;
+    const height = 1080;
+
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // OPTIONAL: use a PNG template
+    const bgPath = path.join(__dirname, '../assets/visual/hacker-ticket.png');
+
+    const bg = await loadImage(bgPath);
+    ctx.drawImage(bg, 0, 0, width, height);
+
+    // Background (remove if using template)
+    // ctx.fillStyle = '#ffffff';
+    // ctx.fillRect(0, 0, width, height);
+
+    // Text styling
+    ctx.fillStyle = '#000000';
+    ctx.font = '700 64px "M PLUS Rounded 1c"';
+    console.log('Resolved →', ctx.font);
+    ctx.textAlign = 'left';
+
+    // Fixed position
+    const x = 576;
+    const y = 365;
+
+    ctx.fillText(firstName, x, y);
+
+    // Send PNG response
+    const buffer = canvas.toBuffer('image/png');
+
+    return new StreamableFile(buffer, {
+      type: 'image/png',
+      disposition: 'attachment; filename="ticket.png"',
+    });
+
+    // res.set({
+    //   'Content-Type': 'image/png',
+    //   'Content-Disposition': 'attachment; filename="ticket.png"',
+    //   'Cache-Control': 'public, max-age=31536000, immutable',
+    // });
+
+    // canvas.createPNGStream().pipe(res);
   }
 }
