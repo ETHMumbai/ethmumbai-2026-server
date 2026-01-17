@@ -60,19 +60,19 @@ export class TicketsController {
       },
       orderBy: { priority: 'asc' },
     });
-  
+
     if (!ticket) {
       return { message: 'No active tickets available.' };
     }
-  
+
     const discount = getDiscount(ticket.fiat); // e.g., { amount, percentage, originalPrice }
     const discountedPrice = ticket.fiat; // price after discount
-  
+
     // Default values
     let excludingGstCost = 0;
     let cgst = 0;
     let sgst = 0;
-  
+
     // Set values based on discount percentage
     if (discount.percentage === 50) {
       excludingGstCost = 1153.73;
@@ -88,7 +88,7 @@ export class TicketsController {
       cgst = 114.35;
       sgst = 114.35;
     }
-  
+
     return {
       ...ticket,
       discount,
@@ -97,7 +97,6 @@ export class TicketsController {
       sgst,
     };
   }
-  
 
   @Get('/current')
   async getCurrentTicket() {
@@ -118,7 +117,6 @@ export class TicketsController {
       discount: getDiscount(ticket.fiat),
     };
   }
-
 
   @Get('/preview/pdf')
   async previewTicketPdf(
@@ -147,12 +145,13 @@ export class TicketsController {
 
     pdfDoc.pipe(res);
   }
-  @Get('/visual/')
+  @Get('/visual/:ticketType')
   async visualTicket(
+    @Param('ticketType') ticketType: string,
     @Query('firstName') firstName: string,
     @Res() res: Response,
   ) {
-    await this.ticketService.visualTicketGeneration(firstName, res);
+    await this.ticketService.visualTicketGeneration(ticketType, firstName, res);
     // if (!firstName) {
     //   throw new BadRequestException('Missing firstName (f) parameter');
     // }

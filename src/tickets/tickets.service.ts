@@ -27,16 +27,16 @@ import sharp from 'sharp';
 export class TicketsService {
   // private razorpay: ;
   private razorpay: Razorpay;
-  
 
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
-    
-  ) { this.razorpay = new Razorpay({
+  ) {
+    this.razorpay = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID,
       key_secret: process.env.RAZORPAY_KEY_SECRET,
-    });}
+    });
+  }
 
   private async generateTicketCode(): Promise<string> {
     while (true) {
@@ -53,8 +53,6 @@ export class TicketsService {
       if (!exists) return code;
     }
   }
-
-
 
   async generateTicketsForOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
@@ -74,7 +72,7 @@ export class TicketsService {
       orderBy: { priority: 'asc' },
     });
 
-    if(!ticket?.remainingQuantity) {
+    if (!ticket?.remainingQuantity) {
       throw new BadRequestException('Tickets sold out');
     }
 
@@ -138,8 +136,7 @@ export class TicketsService {
       }),
     );
 
-    const pdfBufferInvoice =
-      await this.generateInvoiceForOrder(orderId);
+    const pdfBufferInvoice = await this.generateInvoiceForOrder(orderId);
 
     // SEND ALL PARTICIPANT PDFs
     await this.mailService.sendParticipantEmails(orderId, pdfMap);
@@ -162,8 +159,9 @@ export class TicketsService {
   async generateQRforTicket(ticketCode: string) {
     const qrHash = crypto.createHash('sha256').update(ticketCode).digest('hex');
 
-    const ticketUrl = `${process.env.APP_BASE_URL || 'https://www.ethmumbai.in'
-      }/t/${ticketCode}`;
+    const ticketUrl = `${
+      process.env.APP_BASE_URL || 'https://www.ethmumbai.in'
+    }/t/${ticketCode}`;
 
     return { ticketUrl, qrHash };
   }
@@ -333,14 +331,18 @@ export class TicketsService {
     }
   }
 
-  async visualTicketGeneration(firstName: string, res: Response) {
+  async visualTicketGeneration(
+    ticketType: string,
+    firstName: string,
+    res: Response,
+  ) {
     if (!firstName) {
       throw new BadRequestException('Missing firstName (f) parameter');
     }
 
     const fontPath = path.join(
       __dirname,
-      '../assets/fonts/MPLUSRounded1c-Bold.ttf',
+      '../assets/fonts/MPLUSRounded1c-ExtraBold.ttf',
     );
 
     registerFont(fontPath, {
@@ -357,10 +359,10 @@ export class TicketsService {
     const ctx = canvas.getContext('2d');
 
     // OPTIONAL: use a PNG template
-    const bgPath = path.join(
-      __dirname,
-      "../assets/visual/early-bird-ticket.png",
-    );
+    const bgPath =
+      ticketType == 'earlybird'
+        ? path.join(__dirname, '../assets/visual/early-bird-ticket.png')
+        : path.join(__dirname, '../assets/visual/regular-ticket.png');
 
     const bg = await loadImage(bgPath);
     ctx.drawImage(bg, 0, 0, width, height);
@@ -463,7 +465,7 @@ export class TicketsService {
       item: {
         description: ticket.title,
         quantity: order.participants.length,
-        price: ticket.fiat,//1249
+        price: ticket.fiat, //1249
       },
 
       discount: ticketInfo.discount.amount,
@@ -497,10 +499,7 @@ export class TicketsService {
       return generateInvoicePDFBuffer(invoiceData);
     }
 
-    const invoiceNo = await generateInvoiceNumberForOrder(
-      this.prisma,
-      orderId,
-    );
+    const invoiceNo = await generateInvoiceNumberForOrder(this.prisma, orderId);
 
     const invoiceData = await this.buildInvoiceData({
       ...order,
