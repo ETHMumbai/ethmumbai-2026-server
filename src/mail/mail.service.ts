@@ -3,6 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoopsService } from './loops.service';
+import { Ticket } from 'generated/prisma';
+import { TicketsService } from 'src/tickets/tickets.service';
 
 @Injectable()
 export class MailService {
@@ -11,7 +13,8 @@ export class MailService {
   constructor(
     private prisma: PrismaService,
     private loops: LoopsService,
-  ) {}
+    private ticketService: TicketsService,
+  ) { }
 
   // ---------------------------------------------
   // BUYER CONFIRMATION EMAIL
@@ -217,56 +220,118 @@ export class MailService {
     }
   }
 
+  async sendParticipantEmailsWithPng(
+    email: string,
+  ) {
+    const participant = await this.prisma.participant.findFirst({
+      where: { emailSent: false },
+      include: { generatedTicket: true, order: true },
+    });
+
+    if (!participant) {
+      this.logger.warn(`No participant found with email: ${email}`);
+      return;
+    }
+
+    const templateId = process.env.LOOPS_SHARE_ON_X_EMAIL_ID;
+    if (!templateId) {
+      this.logger.error('Missing env: LOOPS_SHARE_ON_X_EMAIL_ID');
+      return;
+    }
+
+    const ticketType = (participant.order as any)?.ticketType ?? 'regular';
+
+    const ticketCode = participant.generatedTicket?.ticketCode;
+    if (!ticketCode) {
+      this.logger.error(`No ticket code found for participant with email: ${email}`);
+      return;
+    }
+
+    const pngBuffer = (await this.ticketService.visualTicketGeneration(
+        ticketType,
+        participant.firstName,
+      )) as Buffer | undefined;
+
+    if (!pngBuffer) {
+      this.logger.error(`Failed generating PNG for ticket ${ticketCode}`);
+      return;
+    }
+
+    const pngAttachment = {
+      filename: `ETHMumbai-Ticket-${ticketCode}.png`,
+      contentType: 'image/png',
+      data: pngBuffer.toString('base64'),
+    };
+
+    const resp = await this.loops.sendTransactionalEmail(
+      templateId,
+      participant.email,
+      {
+        name: participant.firstName,
+        ticketCode,
+      },
+      [pngAttachment],
+    );
+
+    if (!resp?.success) {
+      this.logger.error(`Failed sending ticket → ${participant.email}`);
+      return;
+    }
+
+    this.logger.log(`Ticket PDF sent → ${participant.email}`);
+    // }
+  }
+
   async sendSingleParticipantEmail(
-  input: {
-    firstName?: string;
-    email: string;
-    ticketCode: string;
-  },
-  pdfMap: Map<string, Buffer>, // ticketCode → PDF buffer
-) {
-  const { firstName, email, ticketCode } = input;
-
-  if (!email || !ticketCode) {
-    this.logger.warn('Missing email or ticketCode');
-    return;
-  }
-
-  const templateId = process.env.LOOPS_PARTICIPANT_EMAIL_ID;
-  if (!templateId) {
-    this.logger.error('Missing env: LOOPS_PARTICIPANT_EMAIL_ID');
-    return;
-  }
-
-  const pdfBuffer = pdfMap.get(ticketCode);
-  if (!pdfBuffer) {
-    this.logger.error(`Missing PDF buffer for ticket ${ticketCode}`);
-    return;
-  }
-  console.log(ticketCode);
-
-  const attachment = {
-    filename: `ETHMumbai-Ticket-${ticketCode}.pdf`,
-    contentType: 'application/pdf',
-    data: pdfBuffer.toString('base64'),
-  };
-
-  const resp = await this.loops.sendTransactionalEmail(
-    templateId,
-    email,
-    {
-      name: firstName ?? '',
-      ticketCode,
+    input: {
+      firstName?: string;
+      email: string;
+      ticketCode: string;
     },
-    [attachment],
-  );
+    pdfMap: Map<string, Buffer>, // ticketCode → PDF buffer
+  ) {
+    const { firstName, email, ticketCode } = input;
 
-  if (!resp?.success) {
-    this.logger.error(`Failed sending ticket → ${email}`);
-    return;
+    if (!email || !ticketCode) {
+      this.logger.warn('Missing email or ticketCode');
+      return;
+    }
+
+    const templateId = process.env.LOOPS_PARTICIPANT_EMAIL_ID;
+    if (!templateId) {
+      this.logger.error('Missing env: LOOPS_PARTICIPANT_EMAIL_ID');
+      return;
+    }
+
+    const pdfBuffer = pdfMap.get(ticketCode);
+    if (!pdfBuffer) {
+      this.logger.error(`Missing PDF buffer for ticket ${ticketCode}`);
+      return;
+    }
+    console.log(ticketCode);
+
+    const attachment = {
+      filename: `ETHMumbai-Ticket-${ticketCode}.pdf`,
+      contentType: 'application/pdf',
+      data: pdfBuffer.toString('base64'),
+    };
+
+    const resp = await this.loops.sendTransactionalEmail(
+      templateId,
+      email,
+      {
+        name: firstName ?? '',
+        ticketCode,
+      },
+      [attachment],
+    );
+
+    if (!resp?.success) {
+      this.logger.error(`Failed sending ticket → ${email}`);
+      return;
+    }
+
+    this.logger.log(`Ticket PDF sent → ${email}`);
   }
-
-  this.logger.log(`Ticket PDF sent → ${email}`);
-}
 
 }
