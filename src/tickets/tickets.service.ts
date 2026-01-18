@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as QRCode from 'qrcode';
@@ -22,11 +23,11 @@ import { Response } from 'express';
 import { createCanvas, loadImage, registerFont } from 'canvas';
 import path from 'path';
 import sharp from 'sharp';
-
 @Injectable()
 export class TicketsService {
   // private razorpay: ;
   private razorpay: Razorpay;
+  private readonly logger = new Logger(TicketsService.name);
 
   constructor(
     private prisma: PrismaService,
@@ -159,9 +160,8 @@ export class TicketsService {
   async generateQRforTicket(ticketCode: string) {
     const qrHash = crypto.createHash('sha256').update(ticketCode).digest('hex');
 
-    const ticketUrl = `${
-      process.env.APP_BASE_URL || 'https://www.ethmumbai.in'
-    }/t/${ticketCode}`;
+    const ticketUrl = `${process.env.APP_BASE_URL || 'https://www.ethmumbai.in'
+      }/t/${ticketCode}`;
 
     return { ticketUrl, qrHash };
   }
@@ -356,9 +356,9 @@ export class TicketsService {
 
     // OPTIONAL: use a PNG template
     const bgPath =
-      ticketType === 'earlybird'
-        ? path.join(__dirname, '../assets/visual/early-bird-ticket.png')
-        : path.join(__dirname, '../assets/visual/regular-ticket.png');
+      ticketType === 'regular'
+        ? path.join(__dirname, '../assets/visual/regular-ticket.png')
+        : path.join(__dirname, '../assets/visual/early-bird-ticket.png');
 
     const bg = await loadImage(bgPath);
     ctx.drawImage(bg, 0, 0, width, height);
@@ -551,4 +551,37 @@ export class TicketsService {
       sgst,
     };
   }
+
+  async sendEmailsWithPngTicket({ email }: { email: string }) {
+    this.logger.log(`sendEmailsWithPngTicket called with ${email}`);
+
+    const participant = await this.prisma.participant.findFirst({
+      where: { email },
+      include: {
+        order: {
+          include: { ticket: true },
+        }
+      },
+    });
+
+    this.logger.log(`Participant: ${participant?.id ?? 'NOT FOUND'}`);
+
+    if (!participant) {
+      throw new BadRequestException(`No participant found with email: ${email}`);
+    }
+
+    const ticketType = participant.order?.ticket?.type ?? 'regular';
+    this.logger.log(`Ticket type: ${ticketType}`);
+
+    const pngBuffer = await this.visualTicketGeneration(
+      ticketType,
+      participant.firstName || 'Participant',
+    );
+
+    this.logger.log(`PNG buffer generated: ${!!pngBuffer}`);
+
+    await this.mailService.sendParticipantEmailsWithPng(email, pngBuffer);
+  }
+
+
 }

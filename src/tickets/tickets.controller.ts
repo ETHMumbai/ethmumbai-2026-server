@@ -189,6 +189,18 @@ export class TicketsController {
     // canvas.createPNGStream().pipe(res);
   }
 
+  @Post('sendEmailsWithPng')
+  async sendEmailsWithPng(@Body() body: { email: string }) {
+    console.log('Sending PNG ticket email to:', body.email);
+    await this.ticketService.sendEmailsWithPngTicket(body);
+    console.log('PNG ticket email sent successfully');
+    return {
+      success: true,
+      message: `PNG ticket email sent to ${body.email}`,
+    };
+  }
+
+
   // @Get('/ticketCount/:ticketType')
   // async getTicketCountByType(@Param('ticketType') ticketType: string) {
   //   return await this.ticketService.getTicketCount(ticketType);

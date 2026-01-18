@@ -4,7 +4,7 @@ import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoopsService } from './loops.service';
 // import { Ticket } from 'generated/prisma';
-import { TicketsService } from 'src/tickets/tickets.service';
+// import { TicketsService } from '../tickets/tickets.service';
 
 @Injectable()
 export class MailService {
@@ -13,7 +13,7 @@ export class MailService {
   constructor(
     private prisma: PrismaService,
     private loops: LoopsService,
-    private ticketService: TicketsService,
+    // private ticketService: TicketsService,
   ) {}
 
   // ---------------------------------------------
@@ -218,10 +218,12 @@ export class MailService {
     }
   }
 
-  async sendParticipantEmailsWithPng(email: string) {
+  async sendParticipantEmailsWithPng(
+    email: string,
+    pngBuffer: Buffer) {
     const participant = await this.prisma.participant.findFirst({
-      where: { emailSent: false },
-      include: { generatedTicket: true, order: true },
+      where: { email },
+      include: { order: true },
     });
 
     if (!participant) {
@@ -235,42 +237,35 @@ export class MailService {
       return;
     }
 
-    const ticketType = (participant.order as any)?.ticketType ?? 'regular';
-
-    const ticketCode = participant.generatedTicket?.ticketCode;
-    if (!ticketCode) {
-      this.logger.error(
-        `No ticket code found for participant with email: ${email}`,
-      );
-      return;
-    }
-
     if (!participant.firstName) {
       throw new BadRequestException('Missing firstName (f) parameter');
     }
 
-    const pngBuffer = (await this.ticketService.visualTicketGeneration(
-      ticketType,
-      participant.firstName,
-    )) as Buffer | undefined;
+    // const pngBuffer = (await this.ticketService.visualTicketGeneration(
+    //   ticketType,
+    //   participant.firstName,
+    // )) as Buffer | undefined;
 
     if (!pngBuffer) {
-      this.logger.error(`Failed generating PNG for ticket ${ticketCode}`);
+      this.logger.error(`Missing PNG buffer for participant ${participant.email}`);
       return;
     }
 
     const pngAttachment = {
-      filename: `ETHMumbai-Ticket-${ticketCode}.png`,
+      filename: `ETHMumbai-Ticket-${participant.firstName}.png`,
       contentType: 'image/png',
       data: pngBuffer.toString('base64'),
     };
+     const tweetText = encodeURIComponent(
+                `Just got my ticket for ETHMumbai 🚀\nSee you in Mumbai!\n\n@ethmumbai`,
+              );
 
     const resp = await this.loops.sendTransactionalEmail(
       templateId,
       participant.email,
       {
         name: participant.firstName,
-        ticketCode,
+        tweetText: tweetText,
       },
       [pngAttachment],
     );
