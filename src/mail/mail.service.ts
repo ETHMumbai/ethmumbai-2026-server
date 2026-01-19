@@ -298,7 +298,7 @@ export class MailService {
       data: pngBuffer.toString('base64'),
     };
      const tweetText = encodeURIComponent(
-                `I'm hacking at @ethmumbai❤️‍🔥\n\nCan't wait to build at the BEST Ethereum hackathon with DeFi, Privacy & AI tracks from 13th – 15th March 2026 in Mumbai 💪`,
+                `I'm hacking at @ethmumbai❤️‍🔥\n\nCan't wait to build at the BEST Ethereum hackathon from 13th – 15th March 2026 on DeFi, Privacy & AI tracks.`,
               );
 
     const resp = await this.loops.sendTransactionalEmail(
