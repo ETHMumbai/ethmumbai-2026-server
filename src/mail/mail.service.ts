@@ -287,7 +287,7 @@ export class MailService {
 
     const templateId = process.env.LOOPS_SHARE_ON_X_HACKER_EMAIL_ID;
     if (!templateId) {
-      this.logger.error('Missing env: LOOPS_SHARE_ON_X_EMAIL_ID');
+      this.logger.error('Missing env: LOOPS_SHARE_ON_X_HACKER_EMAIL_ID');
       return;
     }
 
@@ -298,7 +298,7 @@ export class MailService {
       data: pngBuffer.toString('base64'),
     };
      const tweetText = encodeURIComponent(
-                `I am hacking @ethmumbai 2026 ❤️‍🔥\n\nThe BEST Ethereum hackathon with DeFi, AI & Privacy tracks to build on. Can't wait to build!`,
+                `I'm hacking at @ethmumbai❤️‍🔥\n\nCan't wait to build at the BEST Ethereum hackathon with DeFi, Privacy & AI tracks from 13th – 15th March 2026 in Mumbai 💪`,
               );
 
     const resp = await this.loops.sendTransactionalEmail(

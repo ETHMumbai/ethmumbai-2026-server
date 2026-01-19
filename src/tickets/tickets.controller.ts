@@ -209,7 +209,7 @@ export class TicketsController {
     }
     return {
       success: true,
-      message: `PNG ticket emails sent`,
+      message: `PNG hacker emails sent to ${body.length}`,
     };
   }
 
