@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as QRCode from 'qrcode';
@@ -18,21 +19,25 @@ import { generateInvoiceNumberForOrder } from 'src/utils/ticket.utils';
 import { InvoiceData } from '../utils/generateInvoicePdf';
 import Razorpay from 'razorpay';
 import { getDiscount } from 'src/utils/discount';
-
+import { Response } from 'express';
+import { createCanvas, loadImage, registerFont } from 'canvas';
+import path from 'path';
+import sharp from 'sharp';
 @Injectable()
 export class TicketsService {
   // private razorpay: ;
   private razorpay: Razorpay;
-  
+  private readonly logger = new Logger(TicketsService.name);
 
   constructor(
     private prisma: PrismaService,
     private mailService: MailService,
-    
-  ) { this.razorpay = new Razorpay({
+  ) {
+    this.razorpay = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID,
       key_secret: process.env.RAZORPAY_KEY_SECRET,
-    });}
+    });
+  }
 
   private async generateTicketCode(): Promise<string> {
     while (true) {
@@ -49,8 +54,6 @@ export class TicketsService {
       if (!exists) return code;
     }
   }
-
-
 
   async generateTicketsForOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
@@ -70,7 +73,7 @@ export class TicketsService {
       orderBy: { priority: 'asc' },
     });
 
-    if(!ticket?.remainingQuantity) {
+    if (!ticket?.remainingQuantity) {
       throw new BadRequestException('Tickets sold out');
     }
 
@@ -134,8 +137,7 @@ export class TicketsService {
       }),
     );
 
-    const pdfBufferInvoice =
-      await this.generateInvoiceForOrder(orderId);
+    const pdfBufferInvoice = await this.generateInvoiceForOrder(orderId);
 
     // SEND ALL PARTICIPANT PDFs
     await this.mailService.sendParticipantEmails(orderId, pdfMap);
@@ -329,6 +331,70 @@ export class TicketsService {
     }
   }
 
+  async visualTicketGeneration(ticketType: string | null, firstName: string) {
+    if (!firstName) {
+      throw new BadRequestException('Missing firstName (f) parameter');
+    }
+
+    const fontPath = path.join(
+      __dirname,
+      '../assets/fonts/MPLUSRounded1c-ExtraBold.ttf',
+    );
+
+    registerFont(fontPath, {
+      family: 'M PLUS Rounded 1c',
+      weight: '700',
+    });
+
+    console.log(fontPath);
+
+    const width = 1920;
+    const height = 1080;
+
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+
+    let bgPath: string;
+
+    if (!ticketType) {
+      bgPath = path.join(__dirname, '../assets/visual/hacker-ticket.png');
+    } else if (ticketType === 'regular') {
+      bgPath = path.join(__dirname, '../assets/visual/regular-ticket.png');
+    } else {
+      bgPath = path.join(__dirname, '../assets/visual/early-bird-ticket.png');
+    }
+
+    const bg = await loadImage(bgPath);
+    ctx.drawImage(bg, 0, 0, width, height);
+
+    // Background (remove if using template)
+    // ctx.fillStyle = '#ffffff';
+    // ctx.fillRect(0, 0, width, height);
+
+    // Text styling
+    ctx.fillStyle = '#000000';
+    ctx.font = '700 64px "M PLUS Rounded 1c"';
+    console.log('Resolved →', ctx.font);
+    ctx.textAlign = 'left';
+
+    // Fixed position
+    const x = 576;
+    const y = 365;
+
+    ctx.fillText(firstName, x, y);
+
+    // Send PNG response
+    // res.set({
+    //   'Content-Type': 'image/png',
+    //   'Content-Disposition': 'attachment; filename="ticket.png"',
+    //   'Cache-Control': 'public, max-age=31536000, immutable',
+    // });
+
+    // canvas.createPNGStream().pipe(res);
+    return canvas.toBuffer('image/png');
+  }
+
   async getTicketCount(ticketType: string) {
     // Total earlybird tickets available
     const ticket = await this.prisma.ticket.findFirst({
@@ -401,7 +467,7 @@ export class TicketsService {
       item: {
         description: ticket.title,
         quantity: order.participants.length,
-        price: ticket.fiat,//1249
+        price: ticket.fiat, //1249
       },
 
       discount: ticketInfo.discount.amount,
@@ -435,10 +501,7 @@ export class TicketsService {
       return generateInvoicePDFBuffer(invoiceData);
     }
 
-    const invoiceNo = await generateInvoiceNumberForOrder(
-      this.prisma,
-      orderId,
-    );
+    const invoiceNo = await generateInvoiceNumberForOrder(this.prisma, orderId);
 
     const invoiceData = await this.buildInvoiceData({
       ...order,
@@ -449,50 +512,93 @@ export class TicketsService {
   }
 
   async getCurrentTicketForInvoice() {
-  const ticket = await this.prisma.ticket.findFirst({
-    where: {
-      isActive: true,
-      remainingQuantity: { gt: 0 },
-    },
-    orderBy: { priority: 'asc' },
-  });
+    const ticket = await this.prisma.ticket.findFirst({
+      where: {
+        isActive: true,
+        remainingQuantity: { gt: 0 },
+      },
+      orderBy: { priority: 'asc' },
+    });
 
-  if (!ticket) {
-    throw new NotFoundException('No active tickets available.');
+    if (!ticket) {
+      throw new NotFoundException('No active tickets available.');
+    }
+
+    const discount = getDiscount(ticket.fiat); // e.g., { amount, percentage, originalPrice }
+    const discountedPrice = ticket.fiat; // price after discount
+
+    // Default values
+    let excludingGstCost = 0;
+    let cgst = 0;
+    let sgst = 0;
+
+    // Set values based on discount percentage
+    if (discount.percentage === 50) {
+      excludingGstCost = 1153.73;
+      cgst = 95.27;
+      sgst = 95.27;
+    } else if (discount.percentage === 40) {
+      excludingGstCost = 1270.3;
+      cgst = 114.35;
+      sgst = 114.35;
+    } else {
+      // fallback if other discount percentage
+      excludingGstCost = 1270.3;
+      cgst = 114.35;
+      sgst = 114.35;
+    }
+
+    return {
+      ...ticket,
+      discount,
+      excludingGstCost,
+      cgst,
+      sgst,
+    };
   }
 
-  const discount = getDiscount(ticket.fiat); // e.g., { amount, percentage, originalPrice }
-  const discountedPrice = ticket.fiat; // price after discount
+  async sendEmailsWithPngTicket({ email }: { email: string }) {
+    this.logger.log(`sendEmailsWithPngTicket called with ${email}`);
 
-  // Default values
-  let excludingGstCost = 0;
-  let cgst = 0;
-  let sgst = 0;
+    const participant = await this.prisma.participant.findFirst({
+      where: { email },
+      include: {
+        order: {
+          include: { ticket: true },
+        }
+      },
+    });
 
-  // Set values based on discount percentage
-  if (discount.percentage === 50) {
-    excludingGstCost = 1153.73;
-    cgst = 95.27;
-    sgst = 95.27;
-  } else if (discount.percentage === 40) {
-    excludingGstCost = 1270.3;
-    cgst = 114.35;
-    sgst = 114.35;
-  } else {
-    // fallback if other discount percentage
-    excludingGstCost = 1270.3;
-    cgst = 114.35;
-    sgst = 114.35;
+    this.logger.log(`Participant: ${participant?.id ?? 'NOT FOUND'}`);
+
+    if (!participant) {
+      throw new BadRequestException(`No participant found with email: ${email}`);
+    }
+
+    const ticketType = participant.order?.ticket?.type ?? 'regular';
+    this.logger.log(`Ticket type: ${ticketType}`);
+
+    const pngBuffer = await this.visualTicketGeneration(
+      ticketType,
+      participant.firstName || 'Participant',
+    );
+
+    this.logger.log(`PNG buffer generated: ${!!pngBuffer}`);
+
+    await this.mailService.sendParticipantEmailsWithPng(email, pngBuffer);
   }
 
-  return {
-    ...ticket,
-    discount,
-    excludingGstCost,
-    cgst,
-    sgst,
-  };
-}
+  async sendHackerEmailsWithPngTicket(firstName:string, email: string ) {
+    this.logger.log(`sendHackerEmailsWithPng called with ${email}`);
 
 
+    const pngBuffer = await this.visualTicketGeneration(
+      null,
+     firstName || 'Participant',
+    );
+
+    this.logger.log(`PNG buffer generated: ${!!pngBuffer}`);
+
+    await this.mailService.sendHackerEmailsWithPng(firstName, email, pngBuffer);
+  }
 }

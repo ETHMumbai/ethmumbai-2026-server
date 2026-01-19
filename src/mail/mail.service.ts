@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoopsService } from './loops.service';
+// import { Ticket } from 'generated/prisma';
+// import { TicketsService } from '../tickets/tickets.service';
 
 @Injectable()
 export class MailService {
@@ -11,6 +13,7 @@ export class MailService {
   constructor(
     private prisma: PrismaService,
     private loops: LoopsService,
+    // private ticketService: TicketsService,
   ) {}
 
   // ---------------------------------------------
@@ -87,9 +90,7 @@ export class MailService {
     this.logger.log(`Buyer email sent → ${order.buyer.email}`);
   }
 
-  async sendBuyerCryptoEmail(
-    orderId: string,
-  ) {
+  async sendBuyerCryptoEmail(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -217,56 +218,157 @@ export class MailService {
     }
   }
 
+  async sendParticipantEmailsWithPng(
+    email: string,
+    pngBuffer: Buffer) {
+    const participant = await this.prisma.participant.findFirst({
+      where: { email },
+      include: { order: true },
+    });
+
+    if (!participant) {
+      this.logger.warn(`No participant found with email: ${email}`);
+      return;
+    }
+
+    const templateId = process.env.LOOPS_SHARE_ON_X_EMAIL_ID;
+    if (!templateId) {
+      this.logger.error('Missing env: LOOPS_SHARE_ON_X_EMAIL_ID');
+      return;
+    }
+
+    if (!participant.firstName) {
+      throw new BadRequestException('Missing firstName (f) parameter');
+    }
+
+    // const pngBuffer = (await this.ticketService.visualTicketGeneration(
+    //   ticketType,
+    //   participant.firstName,
+    // )) as Buffer | undefined;
+
+    if (!pngBuffer) {
+      this.logger.error(`Missing PNG buffer for participant ${participant.email}`);
+      return;
+    }
+
+    const pngAttachment = {
+      filename: `ETHMumbai-Ticket-${participant.firstName}.png`,
+      contentType: 'image/png',
+      data: pngBuffer.toString('base64'),
+    };
+     const tweetText = encodeURIComponent(
+                `Just got my ticket for ETHMumbai 🚀\nSee you in Mumbai!\n\n@ethmumbai`,
+              );
+
+    const resp = await this.loops.sendTransactionalEmail(
+      templateId,
+      participant.email,
+      {
+        name: participant.firstName,
+        tweetText: tweetText,
+      },
+      [pngAttachment],
+    );
+
+    if (!resp?.success) {
+      this.logger.error(`Failed sending ticket → ${participant.email}`);
+      return;
+    }
+
+    this.logger.log(`Ticket PDF sent → ${participant.email}`);
+    // }
+  }
+
+  async sendHackerEmailsWithPng(
+    firstName:string,
+    email: string,
+    pngBuffer: Buffer) {
+    
+
+    const templateId = process.env.LOOPS_SHARE_ON_X_HACKER_EMAIL_ID;
+    if (!templateId) {
+      this.logger.error('Missing env: LOOPS_SHARE_ON_X_HACKER_EMAIL_ID');
+      return;
+    }
+
+
+    const pngAttachment = {
+      filename: `ETHMumbai-Hacker-${firstName}.png`,
+      contentType: 'image/png',
+      data: pngBuffer.toString('base64'),
+    };
+     const tweetText = encodeURIComponent(
+                `I'm hacking at @ethmumbai❤️‍🔥\n\nCan't wait to build at the BEST Ethereum hackathon from 13th – 15th March 2026 on DeFi, Privacy & AI tracks.`,
+              );
+
+    const resp = await this.loops.sendTransactionalEmail(
+      templateId,
+      email,
+      {
+        name: firstName,
+        tweetText: tweetText,
+      },
+      [pngAttachment],
+    );
+
+    if (!resp?.success) {
+      this.logger.error(`Failed sending Hacker pass → ${email}`);
+      return;
+    }
+
+    this.logger.log(`Hacker PDF sent → ${email}`);
+    // }
+  }
+
   async sendSingleParticipantEmail(
-  input: {
-    firstName?: string;
-    email: string;
-    ticketCode: string;
-  },
-  pdfMap: Map<string, Buffer>, // ticketCode → PDF buffer
-) {
-  const { firstName, email, ticketCode } = input;
-
-  if (!email || !ticketCode) {
-    this.logger.warn('Missing email or ticketCode');
-    return;
-  }
-
-  const templateId = process.env.LOOPS_PARTICIPANT_EMAIL_ID;
-  if (!templateId) {
-    this.logger.error('Missing env: LOOPS_PARTICIPANT_EMAIL_ID');
-    return;
-  }
-
-  const pdfBuffer = pdfMap.get(ticketCode);
-  if (!pdfBuffer) {
-    this.logger.error(`Missing PDF buffer for ticket ${ticketCode}`);
-    return;
-  }
-  console.log(ticketCode);
-
-  const attachment = {
-    filename: `ETHMumbai-Ticket-${ticketCode}.pdf`,
-    contentType: 'application/pdf',
-    data: pdfBuffer.toString('base64'),
-  };
-
-  const resp = await this.loops.sendTransactionalEmail(
-    templateId,
-    email,
-    {
-      name: firstName ?? '',
-      ticketCode,
+    input: {
+      firstName?: string;
+      email: string;
+      ticketCode: string;
     },
-    [attachment],
-  );
+    pdfMap: Map<string, Buffer>, // ticketCode → PDF buffer
+  ) {
+    const { firstName, email, ticketCode } = input;
 
-  if (!resp?.success) {
-    this.logger.error(`Failed sending ticket → ${email}`);
-    return;
+    if (!email || !ticketCode) {
+      this.logger.warn('Missing email or ticketCode');
+      return;
+    }
+
+    const templateId = process.env.LOOPS_PARTICIPANT_EMAIL_ID;
+    if (!templateId) {
+      this.logger.error('Missing env: LOOPS_PARTICIPANT_EMAIL_ID');
+      return;
+    }
+
+    const pdfBuffer = pdfMap.get(ticketCode);
+    if (!pdfBuffer) {
+      this.logger.error(`Missing PDF buffer for ticket ${ticketCode}`);
+      return;
+    }
+    console.log(ticketCode);
+
+    const attachment = {
+      filename: `ETHMumbai-Ticket-${ticketCode}.pdf`,
+      contentType: 'application/pdf',
+      data: pdfBuffer.toString('base64'),
+    };
+
+    const resp = await this.loops.sendTransactionalEmail(
+      templateId,
+      email,
+      {
+        name: firstName ?? '',
+        ticketCode,
+      },
+      [attachment],
+    );
+
+    if (!resp?.success) {
+      this.logger.error(`Failed sending ticket → ${email}`);
+      return;
+    }
+
+    this.logger.log(`Ticket PDF sent → ${email}`);
   }
-
-  this.logger.log(`Ticket PDF sent → ${email}`);
-}
-
 }

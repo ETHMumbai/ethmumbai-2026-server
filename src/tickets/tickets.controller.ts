@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { getDiscount } from '../utils/discount';
 import type { Response } from 'express';
 import * as QRCode from 'qrcode';
@@ -27,15 +28,23 @@ import {
 import PDFDocument from 'pdfkit';
 import * as path from 'path';
 import * as fs from 'fs';
+import { createCanvas, loadImage, registerFont } from 'canvas';
 import { ApiKeyGuard } from '../utils/api-key-auth';
 import Razorpay from 'razorpay';
 import { generateInvoiceNumberForOrder } from 'src/utils/ticket.utils';
+
+registerFont('assets/fonts/MPLUSRounded1c-Bold.ttf', {
+  family: 'Rounded Mplus 1c',
+  weight: 'bold',
+  style: 'not-rotated',
+});
 
 @Controller('t')
 export class TicketsController {
   private razorpay: Razorpay;
   constructor(
     private readonly ticketService: TicketsService,
+    private readonly mailService: MailService,
     private readonly prisma: PrismaService,
   ) {
     this.razorpay = new Razorpay({
@@ -53,19 +62,19 @@ export class TicketsController {
       },
       orderBy: { priority: 'asc' },
     });
-  
+
     if (!ticket) {
       return { message: 'No active tickets available.' };
     }
-  
+
     const discount = getDiscount(ticket.fiat); // e.g., { amount, percentage, originalPrice }
     const discountedPrice = ticket.fiat; // price after discount
-  
+
     // Default values
     let excludingGstCost = 0;
     let cgst = 0;
     let sgst = 0;
-  
+
     // Set values based on discount percentage
     if (discount.percentage === 50) {
       excludingGstCost = 1153.73;
@@ -81,7 +90,7 @@ export class TicketsController {
       cgst = 114.35;
       sgst = 114.35;
     }
-  
+
     return {
       ...ticket,
       discount,
@@ -90,7 +99,6 @@ export class TicketsController {
       sgst,
     };
   }
-  
 
   @Get('/current')
   async getCurrentTicket() {
@@ -111,7 +119,6 @@ export class TicketsController {
       discount: getDiscount(ticket.fiat),
     };
   }
-
 
   @Get('/preview/pdf')
   async previewTicketPdf(
@@ -140,6 +147,72 @@ export class TicketsController {
 
     pdfDoc.pipe(res);
   }
+  @Get('/visual/:ticketType')
+  async visualTicket(
+    @Param('ticketType') ticketType: string,
+    @Query('firstName') firstName: string,
+  ) {
+    await this.ticketService.visualTicketGeneration(ticketType, firstName);
+    // if (!firstName) {
+    //   throw new BadRequestException('Missing firstName (f) parameter');
+    // }
+
+    // const width = 1920;
+    // const height = 1080;
+
+    // const canvas = createCanvas(width, height);
+    // const ctx = canvas.getContext('2d');
+
+    // // OPTIONAL: use a PNG template
+    // const bg = await loadImage('src/assets/visual/early bird ticket.png');
+    // ctx.drawImage(bg, 0, 0, width, height);
+
+    // // Background (remove if using template)
+    // // ctx.fillStyle = '#ffffff';
+    // // ctx.fillRect(0, 0, width, height);
+
+    // // Text styling
+    // ctx.fillStyle = '#000000';
+    // ctx.font = 'bold 64px "Rounded Mplus 1c"';
+    // ctx.textAlign = 'left';
+
+    // // Fixed position
+    // const x = 576;
+    // const y = 365;
+
+    // ctx.fillText(firstName, x, y);
+
+    // // Send PNG response
+    // res.set({
+    //   'Content-Type': 'image/png',
+    //   'Content-Disposition': 'inline; filename="ticket.png"',
+    // });
+
+    // canvas.createPNGStream().pipe(res);
+  }
+
+  @Post('sendEmailsWithPng')
+  async sendEmailsWithPng(@Body() body: { email: string }) {
+    console.log('Sending PNG ticket email to:', body.email);
+    await this.ticketService.sendEmailsWithPngTicket(body);
+    console.log('PNG ticket email sent successfully');
+    return {
+      success: true,
+      message: `PNG ticket email sent to ${body.email}`,
+    };
+  }
+
+  @Post('hacker/sendEmailsWithPng')
+  async sendHackerEmailsWithPng(@Body() body: { firstName:string, email: string } []) {
+    for (const { firstName, email } of body) {
+      await this.ticketService.sendHackerEmailsWithPngTicket(firstName, email);
+    }
+    return {
+      success: true,
+      message: `PNG hacker emails sent to ${body.length}`,
+    };
+  }
+
 
   // @Get('/ticketCount/:ticketType')
   // async getTicketCountByType(@Param('ticketType') ticketType: string) {
