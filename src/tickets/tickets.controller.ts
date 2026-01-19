@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { getDiscount } from '../utils/discount';
 import type { Response } from 'express';
 import * as QRCode from 'qrcode';
@@ -43,6 +44,7 @@ export class TicketsController {
   private razorpay: Razorpay;
   constructor(
     private readonly ticketService: TicketsService,
+    private readonly mailService: MailService,
     private readonly prisma: PrismaService,
   ) {
     this.razorpay = new Razorpay({
@@ -197,6 +199,17 @@ export class TicketsController {
     return {
       success: true,
       message: `PNG ticket email sent to ${body.email}`,
+    };
+  }
+
+  @Post('hacker/sendEmailsWithPng')
+  async sendHackerEmailsWithPng(@Body() body: { firstName:string, email: string } []) {
+    for (const { firstName, email } of body) {
+      await this.ticketService.sendHackerEmailsWithPngTicket(firstName, email);
+    }
+    return {
+      success: true,
+      message: `PNG ticket emails sent`,
     };
   }
 

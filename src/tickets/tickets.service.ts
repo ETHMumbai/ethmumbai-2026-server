@@ -331,7 +331,7 @@ export class TicketsService {
     }
   }
 
-  async visualTicketGeneration(ticketType: string, firstName: string) {
+  async visualTicketGeneration(ticketType: string | null, firstName: string) {
     if (!firstName) {
       throw new BadRequestException('Missing firstName (f) parameter');
     }
@@ -354,11 +354,16 @@ export class TicketsService {
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
-    // OPTIONAL: use a PNG template
-    const bgPath =
-      ticketType === 'regular'
-        ? path.join(__dirname, '../assets/visual/regular-ticket.png')
-        : path.join(__dirname, '../assets/visual/early-bird-ticket.png');
+
+    let bgPath: string;
+
+    if (!ticketType) {
+      bgPath = path.join(__dirname, '../assets/visual/hacker-ticket.png');
+    } else if (ticketType === 'regular') {
+      bgPath = path.join(__dirname, '../assets/visual/regular-ticket.png');
+    } else {
+      bgPath = path.join(__dirname, '../assets/visual/early-bird-ticket.png');
+    }
 
     const bg = await loadImage(bgPath);
     ctx.drawImage(bg, 0, 0, width, height);
@@ -583,5 +588,17 @@ export class TicketsService {
     await this.mailService.sendParticipantEmailsWithPng(email, pngBuffer);
   }
 
+  async sendHackerEmailsWithPngTicket(firstName:string, email: string ) {
+    this.logger.log(`sendHackerEmailsWithPng called with ${email}`);
 
+
+    const pngBuffer = await this.visualTicketGeneration(
+      null,
+     firstName || 'Participant',
+    );
+
+    this.logger.log(`PNG buffer generated: ${!!pngBuffer}`);
+
+    await this.mailService.sendHackerEmailsWithPng(firstName, email, pngBuffer);
+  }
 }

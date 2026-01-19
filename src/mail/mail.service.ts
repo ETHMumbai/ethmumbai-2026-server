@@ -279,6 +279,47 @@ export class MailService {
     // }
   }
 
+  async sendHackerEmailsWithPng(
+    firstName:string,
+    email: string,
+    pngBuffer: Buffer) {
+    
+
+    const templateId = process.env.LOOPS_SHARE_ON_X_HACKER_EMAIL_ID;
+    if (!templateId) {
+      this.logger.error('Missing env: LOOPS_SHARE_ON_X_EMAIL_ID');
+      return;
+    }
+
+
+    const pngAttachment = {
+      filename: `ETHMumbai-Hacker-${firstName}.png`,
+      contentType: 'image/png',
+      data: pngBuffer.toString('base64'),
+    };
+     const tweetText = encodeURIComponent(
+                `I am hacking @ethmumbai 2026 ❤️‍🔥\n\nThe BEST Ethereum hackathon with DeFi, AI & Privacy tracks to build on. Can't wait to build!`,
+              );
+
+    const resp = await this.loops.sendTransactionalEmail(
+      templateId,
+      email,
+      {
+        name: firstName,
+        tweetText: tweetText,
+      },
+      [pngAttachment],
+    );
+
+    if (!resp?.success) {
+      this.logger.error(`Failed sending Hacker pass → ${email}`);
+      return;
+    }
+
+    this.logger.log(`Hacker PDF sent → ${email}`);
+    // }
+  }
+
   async sendSingleParticipantEmail(
     input: {
       firstName?: string;
