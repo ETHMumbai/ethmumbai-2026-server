@@ -167,6 +167,27 @@ export class TicketsController {
     };
   }
 
+  @Post('sendEmailsWithPngForMultiple')
+  async sendEmailsWithPngForMultiple() {
+    const body = this.prisma.participant.findMany({
+      where: {
+       generatedTicket: {
+          isNot: null,
+        },
+      }
+    });
+
+    for (const participant of await body) {
+      console.log('Sending PNG ticket email to:', participant.email);
+      await this.ticketService.sendEmailsWithPngTicket({ email: participant.email });
+      console.log('PNG ticket email sent successfully to:', participant.email);
+    }
+    return {
+      success: true,
+      message: `PNG ticket email sent to ${(await body).length}`,
+    };
+  }
+
   @Post('hacker/sendEmailsWithPng')
   async sendHackerEmailsWithPng(@Body() body: { firstName:string, email: string } []) {
     for (const { firstName, email } of body) {

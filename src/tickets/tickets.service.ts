@@ -620,15 +620,20 @@ export class TicketsService {
     this.logger.log(`sendEmailsWithPngTicket called with ${email}`);
 
     const participant = await this.prisma.participant.findFirst({
-      where: { email },
+      where: {
+        email, generatedTicket: {
+          isNot: null,
+        },
+      },
+
       include: {
         order: {
           include: { ticket: true },
-        }
+        },
       },
     });
 
-    this.logger.log(`Participant: ${participant?.id ?? 'NOT FOUND'}`);
+    this.logger.log(`Participant: ${participant?.id ?? 'NOT FOUND | Ticket not generated'}`);
 
     if (!participant) {
       throw new BadRequestException(`No participant found with email: ${email}`);
@@ -647,13 +652,13 @@ export class TicketsService {
     await this.mailService.sendParticipantEmailsWithPng(email, pngBuffer);
   }
 
-  async sendHackerEmailsWithPngTicket(firstName:string, email: string ) {
+  async sendHackerEmailsWithPngTicket(firstName: string, email: string) {
     this.logger.log(`sendHackerEmailsWithPng called with ${email}`);
 
 
     const pngBuffer = await this.visualTicketGeneration(
       null,
-     firstName || 'Participant',
+      firstName || 'Participant',
     );
 
     this.logger.log(`PNG buffer generated: ${!!pngBuffer}`);
