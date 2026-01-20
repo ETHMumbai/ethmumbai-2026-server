@@ -257,7 +257,7 @@ export class MailService {
       data: pngBuffer.toString('base64'),
     };
      const tweetText = encodeURIComponent(
-                `Just got my ticket for ETHMumbai 🚀\nSee you in Mumbai!\n\n@ethmumbai`,
+                `I’m attending @ethmumbai 2026 ❤️‍🔥\n\nThe BEST Ethereum conference across DeFi, AI & Privacy. Can’t wait to be there!`,
               );
 
     const resp = await this.loops.sendTransactionalEmail(
