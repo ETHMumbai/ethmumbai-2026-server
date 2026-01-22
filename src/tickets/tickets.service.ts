@@ -287,7 +287,7 @@ export class TicketsService {
     };
   }
 
-  async verifyAndMark(token: string) {
+  async verifyAndMark(token: string, checkedInBy: string) {
     if (!token) throw new BadRequestException('token required');
 
     const qrHash = crypto.createHash('sha256').update(token).digest('hex');
@@ -304,7 +304,7 @@ export class TicketsService {
 
     const result = await this.prisma.generatedTicket.update({
       where: { qrHash, checkedIn: false },
-      data: { checkedIn: true },
+      data: { checkedIn: true, checkedInAt: new Date(), checkedInBy: checkedInBy },
     });
 
     if (result) {
@@ -601,4 +601,32 @@ export class TicketsService {
 
     await this.mailService.sendHackerEmailsWithPng(firstName, email, pngBuffer);
   }
+
+
+  async getTicketDetails(input: string) {
+  const ticket = await this.prisma.generatedTicket.findFirst({
+    where: {
+      OR: [
+        { participant: { email: input } },
+        { ticketCode: input },
+      ],
+    },
+    include: {
+      participant: true,
+    },
+  });
+
+  if (!ticket) {
+    throw new NotFoundException('Ticket not found');
+  }
+
+  return {
+    ticketCode: ticket.ticketCode,
+    participant : ticket.participant.firstName,
+    participantEmail: ticket.participant.email,
+    qrUrl: ticket.qrUrl,
+    checkedIn: ticket.checkedIn,
+  };
+}
+
 }

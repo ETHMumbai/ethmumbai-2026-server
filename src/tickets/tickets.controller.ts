@@ -332,23 +332,30 @@ export class TicketsController {
     res.send(pdfBuffer);
   }
 
+   @Get('/details/:input')
+  async getTicketDetails(@Param('input') input: string){
+    console.log('🎯 Controller hit with input:', input);
+    return await this.ticketService.getTicketDetails(input);
+  }
+
   //check-in is happening when this endpoint is hit -> change this to include a button/check that can be used by the team to check-in
   @UseGuards(ApiKeyGuard)
   @Get('/:token')
-  async verify(@Param('token') token: string) {
-    const resp = await this.ticketService.verifyAndMark(token);
+  async verify(@Param('token') token: string,  @Query('checkedInBy') checkedInBy: string,) {
+    //show the participant details if the token is valid
+    //have a seperate call for verifying ticket
+    const resp = await this.ticketService.verifyAndMark(token, checkedInBy);
     if (resp?.ok == false) {
       return 'Check-in failed: ' + resp?.reason;
     }
-    return (
-      'Hi ' +
-      resp?.participantName +
-      ', Welcome to ETHMumbai! You have received the ' +
-      resp?.ticketTypeTitle +
-      ' ETHMumbai Conference ticket with ticket code : ' +
-      token +
-      ' paid for by ' +
-      resp?.buyerName
-    );
+    return {
+    ok: true,
+    message: `Hi ${resp?.participantName}, Welcome to ETHMumbai!`,
+    participantName: resp?.participantName,
+    ticketType: resp?.ticketTypeTitle,
+    ticketCode: token,
+    buyerName: resp?.buyerName,
+  };
   }
+ 
 }
