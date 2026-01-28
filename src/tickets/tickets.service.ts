@@ -58,7 +58,7 @@ export class TicketsService {
   async generateTicketsForOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { participants: true },
+      include: { participants: true, ticket: true },
     });
 
     if (!order) throw new NotFoundException('Order not found');
@@ -91,6 +91,7 @@ export class TicketsService {
     });
 
     const pdfMap = new Map<string, Buffer>();
+    const pngMap = new Map<string, Buffer>();
 
     await Promise.all(
       order.participants.map(async (participant) => {
@@ -123,6 +124,16 @@ export class TicketsService {
         });
 
         pdfMap.set(ticketCode, pdfBuffer);
+
+        const ticketType = order?.ticket?.type ?? 'regular';
+        this.logger.log(`Ticket type: ${ticketType}`);
+
+        const pngBuffer = await this.visualTicketGeneration(
+          ticketType,
+          participant.firstName || 'Participant',
+        );
+
+        pngMap.set(ticketCode || 'Participant', pngBuffer);
         // convert dataURL → PNG file (example path)
         // const filePath = `./qr/tickets/${ticketCode}.png`;
 
@@ -140,7 +151,7 @@ export class TicketsService {
     const pdfBufferInvoice = await this.generateInvoiceForOrder(orderId);
 
     // SEND ALL PARTICIPANT PDFs
-    await this.mailService.sendParticipantEmails(orderId, pdfMap);
+    await this.mailService.sendParticipantEmails(orderId, pdfMap, pngMap);
 
     // SEND BUYER CONFIRMATION
     if (order.paymentType === 'RAZORPAY') {
@@ -596,7 +607,7 @@ export class TicketsService {
       excludingGstCost = 1153.73;
       cgst = 95.27;
       sgst = 95.27;
-    } else if (discount.percentage === 40) {
+    } else if (discount.percentage === 100) {
       excludingGstCost = 1270.3;
       cgst = 114.35;
       sgst = 114.35;

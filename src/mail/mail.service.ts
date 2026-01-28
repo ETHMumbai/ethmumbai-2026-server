@@ -14,7 +14,7 @@ export class MailService {
     private prisma: PrismaService,
     private loops: LoopsService,
     // private ticketService: TicketsService,
-  ) {}
+  ) { }
 
   // ---------------------------------------------
   // BUYER CONFIRMATION EMAIL
@@ -157,6 +157,7 @@ export class MailService {
   async sendParticipantEmails(
     orderId: string,
     pdfMap: Map<string, Buffer>, // ticketCode → PDF buffer
+    pngMap: Map<string, Buffer> // ticketCode → PNG buffer
   ) {
     const participants = await this.prisma.participant.findMany({
       where: { orderId, emailSent: false },
@@ -168,9 +169,9 @@ export class MailService {
       return;
     }
 
-    const templateId = process.env.LOOPS_PARTICIPANT_EMAIL_ID;
+    const templateId = process.env.LOOPS_PARTICIPANT_EMAIL_PNG_ID;
     if (!templateId) {
-      this.logger.error('Missing env: LOOPS_PARTICIPANT_EMAIL_ID');
+      this.logger.error('Missing env: LOOPS_PARTICIPANT_EMAIL_PNG_ID');
       return;
     }
 
@@ -186,6 +187,21 @@ export class MailService {
         continue;
       }
 
+      const pngBuffer = pngMap.get(ticketCode);
+      if (!pngBuffer) {
+        this.logger.error(`Missing PNG buffer for ticket ${ticketCode}`);
+        continue;
+      }
+
+      const pngAttachment = {
+        filename: `ETHMumbai-Ticket-${p.firstName}.png`,
+        contentType: 'image/png',
+        data: pngBuffer.toString('base64'),
+      };
+      const tweetText = encodeURIComponent(
+        `I’m attending @ethmumbai 2026 ❤️‍🔥\n\nThe BEST Ethereum conference across DeFi, AI & Privacy. Can’t wait to be there!`,
+      );
+
       const attachment = {
         filename: `ETHMumbai-Ticket-${ticketCode}.pdf`,
         contentType: 'application/pdf',
@@ -199,8 +215,9 @@ export class MailService {
           name: p.firstName,
           orderId,
           ticketCode,
+          tweetText: tweetText,
         },
-        [attachment],
+        [attachment, pngAttachment],
       );
 
       if (!resp?.success) {
@@ -256,16 +273,16 @@ export class MailService {
       contentType: 'image/png',
       data: pngBuffer.toString('base64'),
     };
-     const tweetText = encodeURIComponent(
-                `I’m attending @ethmumbai 2026 ❤️‍🔥\n\nThe BEST Ethereum conference across DeFi, AI & Privacy. Can’t wait to be there!`,
-              );
+    const tweetText = encodeURIComponent(
+      `I’m attending @ethmumbai 2026 ❤️‍🔥\n\nThe BEST Ethereum conference across DeFi, AI & Privacy. Can’t wait to be there!`,
+    );
 
     const resp = await this.loops.sendTransactionalEmail(
       templateId,
       participant.email,
       {
         name: participant.firstName,
-        tweetText: tweetText,
+        tweetText,
       },
       [pngAttachment],
     );
@@ -280,10 +297,10 @@ export class MailService {
   }
 
   async sendHackerEmailsWithPng(
-    firstName:string,
+    firstName: string,
     email: string,
     pngBuffer: Buffer) {
-    
+
 
     const templateId = process.env.LOOPS_SHARE_ON_X_HACKER_EMAIL_ID;
     if (!templateId) {
@@ -297,9 +314,9 @@ export class MailService {
       contentType: 'image/png',
       data: pngBuffer.toString('base64'),
     };
-     const tweetText = encodeURIComponent(
-                `I'm hacking at @ethmumbai❤️‍🔥\n\nCan't wait to build at the BEST Ethereum hackathon from 13th – 15th March 2026 on DeFi, Privacy & AI tracks.`,
-              );
+    const tweetText = encodeURIComponent(
+      `I'm hacking at @ethmumbai❤️‍🔥\n\nCan't wait to build at the BEST Ethereum hackathon from 13th – 15th March 2026 on DeFi, Privacy & AI tracks.`,
+    );
 
     const resp = await this.loops.sendTransactionalEmail(
       templateId,
