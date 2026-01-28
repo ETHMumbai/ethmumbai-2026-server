@@ -147,7 +147,7 @@ export function generateInvoicePDF(
 
   doc
     .font('Regular')
-    .text(`ETHMumbai Conference Ticket - Regular`, 50, tableTop + 45)
+    .text('ETHMumbai Conference Ticket - Regular', 50, tableTop + 45)
     .text(String(quantity), COL_QTY, tableTop + 45)
     .text(`INR ${actualTicketPrice.toLocaleString()}`, COL_PRICE, tableTop + 45)
     .text(`INR ${itemTotal.toLocaleString()}`, COL_TOTAL, tableTop + 45);
