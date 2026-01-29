@@ -58,7 +58,7 @@ export class TicketsService {
   async generateTicketsForOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { participants: true },
+      include: { participants: true, ticket: true },
     });
 
     if (!order) throw new NotFoundException('Order not found');
@@ -91,6 +91,7 @@ export class TicketsService {
     });
 
     const pdfMap = new Map<string, Buffer>();
+    const pngMap = new Map<string, Buffer>();
 
     await Promise.all(
       order.participants.map(async (participant) => {
@@ -123,6 +124,16 @@ export class TicketsService {
         });
 
         pdfMap.set(ticketCode, pdfBuffer);
+
+        const ticketType = order?.ticket?.type ?? 'regular';
+        this.logger.log(`Ticket type: ${ticketType}`);
+
+        const pngBuffer = await this.visualTicketGeneration(
+          ticketType,
+          participant.firstName || 'Participant',
+        );
+
+        pngMap.set(ticketCode || 'Participant', pngBuffer);
         // convert dataURL → PNG file (example path)
         // const filePath = `./qr/tickets/${ticketCode}.png`;
 
@@ -140,7 +151,7 @@ export class TicketsService {
     const pdfBufferInvoice = await this.generateInvoiceForOrder(orderId);
 
     // SEND ALL PARTICIPANT PDFs
-    await this.mailService.sendParticipantEmails(orderId, pdfMap);
+    await this.mailService.sendParticipantEmails(orderId, pdfMap, pngMap);
 
     // SEND BUYER CONFIRMATION
     if (order.paymentType === 'RAZORPAY') {
@@ -395,6 +406,65 @@ export class TicketsService {
     return canvas.toBuffer('image/png');
   }
 
+  async visualTicketGenerationPng(ticketType: string, firstName: string, res: Response) {
+    if (!firstName) {
+      throw new BadRequestException('Missing firstName (f) parameter');
+    }
+
+    const fontPath = path.join(
+      __dirname,
+      '../assets/fonts/MPLUSRounded1c-ExtraBold.ttf',
+    );
+
+    registerFont(fontPath, {
+      family: 'M PLUS Rounded 1c',
+      weight: '700',
+    });
+
+    console.log(fontPath);
+
+    const width = 1920;
+    const height = 1080;
+
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // OPTIONAL: use a PNG template
+    const bgPath =
+      ticketType === 'regular'
+        ? path.join(__dirname, '../assets/visual/regular-ticket.png')
+        : path.join(__dirname, '../assets/visual/early-bird-ticket.png');
+
+    const bg = await loadImage(bgPath);
+    ctx.drawImage(bg, 0, 0, width, height);
+
+    // Background (remove if using template)
+    // ctx.fillStyle = '#ffffff';
+    // ctx.fillRect(0, 0, width, height);
+
+    // Text styling
+    ctx.fillStyle = '#000000';
+    ctx.font = '700 64px "M PLUS Rounded 1c"';
+    console.log('Resolved →', ctx.font);
+    ctx.textAlign = 'left';
+
+    // Fixed position
+    const x = 576;
+    const y = 365;
+
+    ctx.fillText(firstName, x, y);
+
+    // Send PNG response
+    res.set({
+      'Content-Type': 'image/png',
+      'Content-Disposition': 'attachment; filename="ticket.png"',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    });
+
+    canvas.createPNGStream().pipe(res);
+    // return canvas.toBuffer('image/png');
+  }
+
   async getTicketCount(ticketType: string) {
     // Total earlybird tickets available
     const ticket = await this.prisma.ticket.findFirst({
@@ -565,15 +635,20 @@ export class TicketsService {
     this.logger.log(`sendEmailsWithPngTicket called with ${email}`);
 
     const participant = await this.prisma.participant.findFirst({
-      where: { email },
+      where: {
+        email, generatedTicket: {
+          isNot: null,
+        },
+      },
+
       include: {
         order: {
           include: { ticket: true },
-        }
+        },
       },
     });
 
-    this.logger.log(`Participant: ${participant?.id ?? 'NOT FOUND'}`);
+    this.logger.log(`Participant: ${participant?.id ?? 'NOT FOUND | Ticket not generated'}`);
 
     if (!participant) {
       throw new BadRequestException(`No participant found with email: ${email}`);
@@ -592,13 +667,13 @@ export class TicketsService {
     await this.mailService.sendParticipantEmailsWithPng(email, pngBuffer);
   }
 
-  async sendHackerEmailsWithPngTicket(firstName:string, email: string ) {
+  async sendHackerEmailsWithPngTicket(firstName: string, email: string) {
     this.logger.log(`sendHackerEmailsWithPng called with ${email}`);
 
 
     const pngBuffer = await this.visualTicketGeneration(
       null,
-     firstName || 'Participant',
+      firstName || 'Participant',
     );
 
     this.logger.log(`PNG buffer generated: ${!!pngBuffer}`);
