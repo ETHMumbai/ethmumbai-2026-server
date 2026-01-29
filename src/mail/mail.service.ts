@@ -14,7 +14,7 @@ export class MailService {
     private prisma: PrismaService,
     private loops: LoopsService,
     // private ticketService: TicketsService,
-  ) { }
+  ) {}
 
   // ---------------------------------------------
   // BUYER CONFIRMATION EMAIL
