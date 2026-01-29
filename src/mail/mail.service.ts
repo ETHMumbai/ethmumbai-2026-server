@@ -199,7 +199,8 @@ export class MailService {
         data: pngBuffer.toString('base64'),
       };
       const tweetText = encodeURIComponent(
-        `I’m attending @ethmumbai 2026 ❤️‍🔥\n\nThe BEST Ethereum conference across DeFi, AI & Privacy. Can’t wait to be there!`,
+        `I'm attending @ethmumbai 2026 🥳
+\n\nBEST Ethereum Conference in Mumbai on 12th March 2026 with 50 speakers & 500 participants. See you there!`,
       );
 
       const attachment = {
@@ -274,7 +275,8 @@ export class MailService {
       data: pngBuffer.toString('base64'),
     };
     const tweetText = encodeURIComponent(
-      `I’m attending @ethmumbai 2026 ❤️‍🔥\n\nThe BEST Ethereum conference across DeFi, AI & Privacy. Can’t wait to be there!`,
+      `I'm attending @ethmumbai 2026 🥳
+\n\nBEST Ethereum Conference in Mumbai on 12th March 2026 with 50 speakers & 500 participants. See you there!`,
     );
 
     const resp = await this.loops.sendTransactionalEmail(
