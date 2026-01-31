@@ -151,44 +151,9 @@ export class TicketsController {
   async visualTicket(
     @Param('ticketType') ticketType: string,
     @Query('firstName') firstName: string,
+    @Res() res: Response,
   ) {
-    await this.ticketService.visualTicketGeneration(ticketType, firstName);
-    // if (!firstName) {
-    //   throw new BadRequestException('Missing firstName (f) parameter');
-    // }
-
-    // const width = 1920;
-    // const height = 1080;
-
-    // const canvas = createCanvas(width, height);
-    // const ctx = canvas.getContext('2d');
-
-    // // OPTIONAL: use a PNG template
-    // const bg = await loadImage('src/assets/visual/early bird ticket.png');
-    // ctx.drawImage(bg, 0, 0, width, height);
-
-    // // Background (remove if using template)
-    // // ctx.fillStyle = '#ffffff';
-    // // ctx.fillRect(0, 0, width, height);
-
-    // // Text styling
-    // ctx.fillStyle = '#000000';
-    // ctx.font = 'bold 64px "Rounded Mplus 1c"';
-    // ctx.textAlign = 'left';
-
-    // // Fixed position
-    // const x = 576;
-    // const y = 365;
-
-    // ctx.fillText(firstName, x, y);
-
-    // // Send PNG response
-    // res.set({
-    //   'Content-Type': 'image/png',
-    //   'Content-Disposition': 'inline; filename="ticket.png"',
-    // });
-
-    // canvas.createPNGStream().pipe(res);
+    await this.ticketService.visualTicketGenerationPng(ticketType, firstName, res);
   }
 
   @Post('sendEmailsWithPng')
@@ -199,6 +164,27 @@ export class TicketsController {
     return {
       success: true,
       message: `PNG ticket email sent to ${body.email}`,
+    };
+  }
+
+  @Post('sendEmailsWithPngForMultiple')
+  async sendEmailsWithPngForMultiple() {
+    const body = this.prisma.participant.findMany({
+      where: {
+       generatedTicket: {
+          isNot: null,
+        },
+      }
+    });
+
+    for (const participant of await body) {
+      console.log('Sending PNG ticket email to:', participant.email);
+      await this.ticketService.sendEmailsWithPngTicket({ email: participant.email });
+      console.log('PNG ticket email sent successfully to:', participant.email);
+    }
+    return {
+      success: true,
+      message: `PNG ticket email sent to ${(await body).length}`,
     };
   }
 
