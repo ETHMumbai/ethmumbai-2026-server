@@ -84,11 +84,14 @@ export class TicketsController {
       excludingGstCost = 1270.3;
       cgst = 114.35;
       sgst = 114.35;
+    } else if (discount.percentage === 20) {
+      excludingGstCost = 1694.00;
+      cgst = 152.50;
+      sgst = 152.50;
     } else {
-      // fallback if other discount percentage
-      excludingGstCost = 1270.3;
-      cgst = 114.35;
-      sgst = 114.35;
+      excludingGstCost = 2117.80;
+      cgst = 190.06;
+      sgst = 190.06;
     }
 
     return {
