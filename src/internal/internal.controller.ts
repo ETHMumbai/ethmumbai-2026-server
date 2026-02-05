@@ -17,9 +17,10 @@ import { MailService } from '../mail/mail.service';
 import { ApiKeyGuard } from 'src/utils/api-key-auth';
 import { TicketsService } from 'src/tickets/tickets.service';
 import Razorpay from 'razorpay';
+import JSZip from 'jszip';
 import path from 'path';
 import { createCanvas, loadImage, registerFont } from 'canvas';
-import { Response } from 'express';
+import type { Response } from 'express';
 
 @Controller('internal')
 // @UseGuards(AdminGuard)
@@ -603,4 +604,18 @@ export class InternalController {
 
     // canvas.createPNGStream().pipe(res);
   }
+
+  @Get("download/razorpay-invoices")
+  @UseGuards(ApiKeyGuard)
+  async download(@Res() res: Response) {
+    const zip = await this.ticketsService.downloadSentRazorpayInvoices();
+
+    res.set({
+      "Content-Type": "application/zip",
+      "Content-Disposition": "attachment; filename=sent_razorpay_invoices.zip",
+    });
+
+    res.send(zip);
+  }
+
 }

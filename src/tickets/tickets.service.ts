@@ -22,6 +22,7 @@ import { getDiscount } from 'src/utils/discount';
 import { Response } from 'express';
 import { createCanvas, loadImage, registerFont } from 'canvas';
 import path from 'path';
+import JSZip from 'jszip';
 import sharp from 'sharp';
 @Injectable()
 export class TicketsService {
@@ -679,5 +680,32 @@ export class TicketsService {
     this.logger.log(`PNG buffer generated: ${!!pngBuffer}`);
 
     await this.mailService.sendHackerEmailsWithPng(firstName, email, pngBuffer);
+  }
+
+  async downloadSentRazorpayInvoices(): Promise<Buffer> {
+    const orders = await this.prisma.order.findMany({
+      where: {
+        status: "paid",
+        paymentType: "RAZORPAY",
+        buyerEmailSent: true,
+        invoiceNumber: { not: null },
+      },
+      include: {
+        buyer: { include: { address: true } },
+        ticket: true,
+        participants: true,
+      },
+    });
+
+    const zip = new JSZip();
+
+    for (const order of orders) {
+      const invoiceData = await this.buildInvoiceData(order);
+      const pdfBuffer = await generateInvoicePDFBuffer(invoiceData);
+
+      zip.file(`Invoice_${order.invoiceNumber}.pdf`, pdfBuffer);
+    }
+
+    return zip.generateAsync({ type: "nodebuffer" });
   }
 }
