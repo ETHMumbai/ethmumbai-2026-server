@@ -370,7 +370,7 @@ export class InternalController {
   ) {
     // const { firstName, lastName, email } = body;
     const ticket = await this.prisma.ticket.findFirst({
-      where: { type: 'standard' },
+      where: { type: 'friends' },
     });
     if (!ticket) {
       throw new BadRequestException('Ticket not found');
@@ -450,7 +450,10 @@ export class InternalController {
           );
         }
       }
+
     }
+
+    return { success: true, message: `Tickets processed for ${body.length || 0} participants` };
   }
 
   @Post('sendTicketsForExistingOrder')

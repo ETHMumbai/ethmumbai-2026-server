@@ -154,11 +154,11 @@ export class TicketsService {
     await this.mailService.sendParticipantEmails(orderId, pdfMap, pngMap);
 
     // SEND BUYER CONFIRMATION
-    if (order.paymentType === 'RAZORPAY') {
-      await this.mailService.sendBuyerEmail(orderId, pdfBufferInvoice);
-    } else {
-      await this.mailService.sendBuyerCryptoEmail(orderId);
-    }
+    // if (order.paymentType === 'RAZORPAY') {
+    //   await this.mailService.sendBuyerEmail(orderId, pdfBufferInvoice);
+    // } else {
+    //   await this.mailService.sendBuyerCryptoEmail(orderId);
+    // }
 
     // await this.prisma.ticket.update({
     //   where: { id: order.ticketId },
@@ -370,7 +370,7 @@ export class TicketsService {
 
     if (!ticketType) {
       bgPath = path.join(__dirname, '../assets/visual/hacker-ticket.png');
-    } else if (ticketType === 'regular') {
+    } else if (ticketType === 'regular' || ticketType === 'friends') {
       bgPath = path.join(__dirname, '../assets/visual/regular-ticket.png');
     } else {
       bgPath = path.join(__dirname, '../assets/visual/early-bird-ticket.png');
