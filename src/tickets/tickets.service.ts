@@ -18,7 +18,7 @@ import { generateInvoicePDFBuffer } from 'src/utils/generateInvoicePdf';
 import { generateInvoiceNumberForOrder } from 'src/utils/ticket.utils';
 import { InvoiceData } from '../utils/generateInvoicePdf';
 import Razorpay from 'razorpay';
-import { getDiscount } from 'src/utils/discount';
+import { getDiscount, getDiscountByQuantity } from 'src/utils/discount';
 import { Response } from 'express';
 import { createCanvas, loadImage, registerFont } from 'canvas';
 import path from 'path';
@@ -519,7 +519,34 @@ export class TicketsService {
           rzpLabel = payment.method;
       }
     }
+    const sangviAmount = 1249;
+    const discount = getDiscountByQuantity(order.amount, order.participants.length);
 
+    let excludingGstCost = 0;
+    let cgst = 0;
+    let sgst = 0;
+
+    // Set values based on discount percentage
+    if (discount.percentage === 50) {
+      excludingGstCost = 1058.46;
+      cgst = 95.27;
+      sgst = 95.27;
+    } else if (discount.percentage === 40) {
+      excludingGstCost = 1270.3;
+      cgst = 114.35;
+      sgst = 114.35;
+    } else if (discount.percentage === 20) {
+      excludingGstCost = 1694.00;
+      cgst = 152.50;
+      sgst = 152.50;
+    } else {
+      // fallback to 0% discount
+      excludingGstCost = 2117.80;
+      cgst = 190.06;
+      sgst = 190.06;
+    }
+
+    
     const ticketInfo = await this.getCurrentTicketForInvoice();
     const quantity = order.participants.length;
 
@@ -538,15 +565,15 @@ export class TicketsService {
       item: {
         description: ticket.title,
         quantity: order.participants.length,
-        price: ticket.fiat, //1249
+        price: order.amount, //1249
       },
-
-      discount: ticketInfo.discount.amount,
+      amount: order.amount,
+      discount: discount.amount,
       gstRate: 9,
 
-      excludingGstCost: ticketInfo.excludingGstCost,
-      cgst: ticketInfo.cgst,
-      sgst: ticketInfo.sgst,
+      excludingGstCost: excludingGstCost,
+      cgst: cgst,
+      sgst: sgst,
 
       paymentMethod:
         order.paymentType === 'RAZORPAY'

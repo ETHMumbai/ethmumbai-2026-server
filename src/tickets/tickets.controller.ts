@@ -280,7 +280,7 @@ export class TicketsController {
         quantity: order.participants.length,
         price: ticket.fiat,
       },
-
+      amount: order.amount,
       discount: 0,
       gstRate: 18,
 

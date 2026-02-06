@@ -17,6 +17,7 @@ export interface InvoiceData {
     quantity: number;
     price: number;
   };
+  amount: number;
   discount: number;
   gstRate: number; // e.g. 18
   paymentMethod: string;
@@ -169,7 +170,7 @@ export function generateInvoicePDF(
     .text('SUB TOTAL', COL_QTY, totalsTop)
     .text(`INR ${itemTotal.toLocaleString()}`, COL_TOTAL, totalsTop)
     .text('DISCOUNT', COL_QTY, totalsTop + 20)
-    .text(`INR ${totalDiscount.toLocaleString()}`, COL_TOTAL, totalsTop + 20);
+    .text(`INR ${data.discount.toLocaleString()}`, COL_TOTAL, totalsTop + 20);
 
   doc
     .moveTo(COL_QTY, totalsTop + 45)
@@ -179,7 +180,7 @@ export function generateInvoicePDF(
   doc
     .font('Bold')
     .text('TOTAL', COL_QTY, totalsTop + 60)
-    .text(`INR ${discountedTotal.toLocaleString()}`, COL_TOTAL, totalsTop + 60);
+    .text(`INR ${data.amount.toLocaleString()}`, COL_TOTAL, totalsTop + 60);
 
 
   /* ---------- GST ---------- */
