@@ -378,7 +378,7 @@ export class InternalController {
     }
     for (const { firstName, lastName, email } of body) {
       const existingParticipant = await this.prisma.participant.findUnique({
-        where: { email: email, order: { status: 'paid' }, generatedTicket: { is: null } },
+        where: { email: email, order: { status: 'paid' } },
         include: { order: true, generatedTicket: true },
       });
 
