@@ -82,14 +82,14 @@ export class TicketsService {
       throw new BadRequestException('Tickets sold out');
     }
 
-    // await this.prisma.ticket.update({
-    //   where: { id: ticket.id },
-    //   data: {
-    //     remainingQuantity: {
-    //       decrement: ticketQty,
-    //     },
-    //   },
-    // });
+    await this.prisma.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        remainingQuantity: {
+          decrement: ticketQty,
+        },
+      },
+    });
 
     const pdfMap = new Map<string, Buffer>();
     const pngMap = new Map<string, Buffer>();
@@ -155,11 +155,11 @@ export class TicketsService {
     await this.mailService.sendParticipantEmails(orderId, pdfMap, pngMap);
 
     // SEND BUYER CONFIRMATION
-    // if (order.paymentType === 'RAZORPAY') {
-    //   await this.mailService.sendBuyerEmail(orderId, pdfBufferInvoice);
-    // } else {
-    //   await this.mailService.sendBuyerCryptoEmail(orderId);
-    // }
+    if (order.paymentType === 'RAZORPAY') {
+      await this.mailService.sendBuyerEmail(orderId, pdfBufferInvoice);
+    } else {
+      await this.mailService.sendBuyerCryptoEmail(orderId);
+    }
 
     // await this.prisma.ticket.update({
     //   where: { id: order.ticketId },
