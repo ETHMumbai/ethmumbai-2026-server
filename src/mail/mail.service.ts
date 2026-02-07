@@ -237,17 +237,18 @@ export class MailService {
   }
 
   async sendParticipantEmailsWithPng(
+    firstName: string,
     email: string,
     pngBuffer: Buffer) {
-    const participant = await this.prisma.participant.findFirst({
-      where: { email },
-      include: { order: true },
-    });
+    // const participant = await this.prisma.participant.findFirst({
+    //   where: { email },
+    //   include: { order: true },
+    // });
 
-    if (!participant) {
-      this.logger.warn(`No participant found with email: ${email}`);
-      return;
-    }
+    // if (!participant) {
+    //   this.logger.warn(`No participant found with email: ${email}`);
+    //   return;
+    // }
 
     const templateId = process.env.LOOPS_SHARE_ON_X_EMAIL_ID;
     if (!templateId) {
@@ -255,7 +256,7 @@ export class MailService {
       return;
     }
 
-    if (!participant.firstName) {
+    if (!firstName) {
       throw new BadRequestException('Missing firstName (f) parameter');
     }
 
@@ -265,12 +266,12 @@ export class MailService {
     // )) as Buffer | undefined;
 
     if (!pngBuffer) {
-      this.logger.error(`Missing PNG buffer for participant ${participant.email}`);
+      this.logger.error(`Missing PNG buffer for participant ${email}`);
       return;
     }
 
     const pngAttachment = {
-      filename: `ETHMumbai-Ticket-${participant.firstName}.png`,
+      filename: `ETHMumbai-Ticket-${firstName}.png`,
       contentType: 'image/png',
       data: pngBuffer.toString('base64'),
     };
@@ -281,20 +282,20 @@ export class MailService {
 
     const resp = await this.loops.sendTransactionalEmail(
       templateId,
-      participant.email,
+      email,
       {
-        name: participant.firstName,
+        name: firstName,
         tweetText,
       },
       [pngAttachment],
     );
 
     if (!resp?.success) {
-      this.logger.error(`Failed sending ticket → ${participant.email}`);
+      this.logger.error(`Failed sending ticket → ${email}`);
       return;
     }
 
-    this.logger.log(`Ticket PDF sent → ${participant.email}`);
+    this.logger.log(`Ticket PDF sent → ${email}`);
     // }
   }
 

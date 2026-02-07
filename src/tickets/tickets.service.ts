@@ -666,7 +666,7 @@ export class TicketsService {
 
     this.logger.log(`PNG buffer generated: ${!!pngBuffer}`);
 
-    await this.mailService.sendParticipantEmailsWithPng(email, pngBuffer);
+    await this.mailService.sendParticipantEmailsWithPng(firstName, email, pngBuffer);
   }
 
   async sendHackerEmailsWithPngTicket(firstName: string, email: string) {
