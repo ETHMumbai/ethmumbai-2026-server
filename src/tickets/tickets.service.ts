@@ -632,35 +632,36 @@ export class TicketsService {
     };
   }
 
-  async sendEmailsWithPngTicket({ email }: { email: string }) {
+  async sendEmailsWithPngTicket({ firstName, email }: { firstName: string, email: string }) {
     this.logger.log(`sendEmailsWithPngTicket called with ${email}`);
 
-    const participant = await this.prisma.participant.findFirst({
-      where: {
-        email, generatedTicket: {
-          isNot: null,
-        },
-      },
+    // const participant = await this.prisma.participant.findFirst({
+    //   where: {
+    //     email, generatedTicket: {
+    //       isNot: null,
+    //     },
+    //   },
 
-      include: {
-        order: {
-          include: { ticket: true },
-        },
-      },
-    });
+    //   include: {
+    //     order: {
+    //       include: { ticket: true },
+    //     },
+    //   },
+    // });
 
-    this.logger.log(`Participant: ${participant?.id ?? 'NOT FOUND | Ticket not generated'}`);
+    // this.logger.log(`Participant: ${participant?.id ?? 'NOT FOUND | Ticket not generated'}`);
 
-    if (!participant) {
-      throw new BadRequestException(`No participant found with email: ${email}`);
-    }
+    // if (!participant) {
+    //   throw new BadRequestException(`No participant found with email: ${email}`);
+    // }
 
-    const ticketType = participant.order?.ticket?.type ?? 'regular';
+    // const ticketType = participant.order?.ticket?.type ?? 'regular';
+    const ticketType = 'regular';
     this.logger.log(`Ticket type: ${ticketType}`);
 
     const pngBuffer = await this.visualTicketGeneration(
       ticketType,
-      participant.firstName || 'Participant',
+      firstName || 'Participant',
     );
 
     this.logger.log(`PNG buffer generated: ${!!pngBuffer}`);
