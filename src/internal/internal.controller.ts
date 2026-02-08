@@ -443,7 +443,7 @@ export class InternalController {
 
         //generate ticket
         if (createdOrder) {
-          await this.ticketsService.generateTicketsForOrder(createdOrder.id);
+          await this.ticketsService.generateTicketsForFreeOrder(createdOrder.id);
           console.log(
             '✅ Ticket generated for order:',
             createdOrder.participants,
@@ -456,6 +456,18 @@ export class InternalController {
     return { success: true, message: `Tickets processed for ${body.length || 0} participants` };
   }
 
+  //order existing and ticket already generated
+  @Post('resendTicketsForTicketCode')
+  async resendTicketsForTicketCode(
+    @Body() body: { orderId: string; ticketCode: string }
+  ) {
+    await this.ticketsService.generateTicketsForOrderWithTicketCode(
+       body.orderId,
+       body.ticketCode,
+    );
+  }
+
+  // order existing but ticket not generated
   @Post('sendTicketsForExistingOrder')
   async sendTicketsForExistingOrder(
     @Body() body: { firstName: string; lastName: string; email: string }[],
@@ -619,9 +631,21 @@ export class InternalController {
 
   // Send Participant Email with Ticket Creative (PNG)
   @Post('sendEmailsWithPng')
-  async sendEmailsWithPng(@Body() body: { firstName: string, email: string }) {
+  async sendEmailsWithPng(@Body() body: { email: string }) {
     console.log('Sending PNG ticket email to:', body.email);
     await this.ticketsService.sendEmailsWithPngTicket(body);
+    console.log('PNG ticket email sent successfully');
+    return {
+      success: true,
+      message: `PNG ticket email sent to ${body.email}`,
+    };
+  }
+
+    // Send Participant Email with Ticket Creative (PNG) to participants NOT in DB
+  @Post('sendEmailsWithPngToNonParticipants')
+  async sendEmailsWithPngToNonParticipants(@Body() body: { ticketType: string, firstName: string, email: string }) {
+    console.log('Sending PNG ticket email to:', body.email);
+    await this.ticketsService.sendEmailsWithPngTicketNonDB(body);
     console.log('PNG ticket email sent successfully');
     return {
       success: true,
