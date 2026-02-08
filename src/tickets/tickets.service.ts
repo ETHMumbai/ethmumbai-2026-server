@@ -82,34 +82,34 @@ export class TicketsService {
       throw new BadRequestException('Tickets sold out');
     }
 
-    await this.prisma.ticket.update({
-      where: { id: ticket.id },
-      data: {
-        remainingQuantity: {
-          decrement: ticketQty,
-        },
-      },
-    });
+    // await this.prisma.ticket.update({
+    //   where: { id: ticket.id },
+    //   data: {
+    //     remainingQuantity: {
+    //       decrement: ticketQty,
+    //     },
+    //   },
+    // });
 
     const pdfMap = new Map<string, Buffer>();
     const pngMap = new Map<string, Buffer>();
 
     await Promise.all(
       order.participants.map(async (participant) => {
-        const ticketCode = await this.generateTicketCode();
+        const ticketCode = "19CEE8";
 
         const { ticketUrl, qrHash } =
           await this.generateQRforTicket(ticketCode);
 
-        await this.prisma.generatedTicket.create({
-          data: {
-            ticketCode,
-            participantId: participant.id,
-            qrHash,
-            qrUrl: ticketUrl,
-            orderId: order.id,
-          },
-        });
+        // await this.prisma.generatedTicket.create({
+        //   data: {
+        //     ticketCode,
+        //     participantId: participant.id,
+        //     qrHash,
+        //     qrUrl: ticketUrl,
+        //     orderId: order.id,
+        //   },
+        // });
 
         // QR AS BUFFER ONLY
         const qrImageBuffer = await QRCode.toBuffer(ticketUrl, {
