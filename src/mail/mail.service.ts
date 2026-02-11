@@ -22,6 +22,7 @@ export class MailService {
   async sendBuyerEmail(
     orderId: string,
     pdfBuffer: Buffer, // Invoice PDF buffer
+    sentEmailCheck: boolean = false
   ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -36,7 +37,7 @@ export class MailService {
       return;
     }
 
-    if (order.buyerEmailSent) {
+    if (order.buyerEmailSent && !sentEmailCheck) {
       this.logger.warn(`Buyer email already sent for ${order.id}`);
       return;
     }
@@ -90,7 +91,7 @@ export class MailService {
     this.logger.log(`Buyer email sent → ${order.buyer.email}`);
   }
 
-  async sendBuyerCryptoEmail(orderId: string) {
+  async sendBuyerCryptoEmail(orderId: string, sentEmailCheck=false) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -104,7 +105,7 @@ export class MailService {
       return;
     }
 
-    if (order.buyerEmailSent) {
+    if (order.buyerEmailSent && !sentEmailCheck) {
       this.logger.warn(`Buyer email already sent for ${order.id}`);
       return;
     }
@@ -157,10 +158,11 @@ export class MailService {
   async sendParticipantEmails(
     orderId: string,
     pdfMap: Map<string, Buffer>, // ticketCode → PDF buffer
-    pngMap: Map<string, Buffer> // ticketCode → PNG buffer
+    pngMap: Map<string, Buffer>, // ticketCode → PNG buffer
+    sentEmailCheck = false
   ) {
     const participants = await this.prisma.participant.findMany({
-      where: { orderId, emailSent: false },
+      where: { orderId, emailSent: sentEmailCheck },
       include: { generatedTicket: true },
     });
 

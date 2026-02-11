@@ -307,6 +307,88 @@ export class TicketsService {
 
   }
 
+  //v3 generate ticekt for wrong email id
+  async generateTicketForEmail(orderId:string, updateEmail: string, ticketCode: string) {
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { participants: true, ticket: true },
+    });
+
+    if (!order) throw new NotFoundException('Order not found');
+
+    const particpant = await this.prisma.participant.findFirst({
+      where: { orderId, generatedTicket : {ticketCode:ticketCode} }
+    });
+
+    if (particpant?.isBuyer) {
+      await this.prisma.buyer.update({
+        where: { id: order.buyerId },
+        data: { email: updateEmail },
+      });
+    }
+
+    const updateParticipant = await this.prisma.participant.update({
+      where: { id: particpant?.id },
+      data: { email: updateEmail },
+    });
+
+    if (!particpant) throw new NotFoundException('Participant not found');
+
+
+
+    const pdfMap = new Map<string, Buffer>();
+    const pngMap = new Map<string, Buffer>();
+
+    await Promise.all(
+      order.participants.map(async (participant) => {
+
+        const { ticketUrl, qrHash } =
+          await this.generateQRforTicket(ticketCode);
+
+        // QR AS BUFFER ONLY
+        const qrImageBuffer = await QRCode.toBuffer(ticketUrl, {
+          width: 220,
+          errorCorrectionLevel: 'M',
+        });
+
+        // PDF BUFFER
+        const pdfBuffer = await generateTicketPDFBuffer({
+          name: participant.firstName || 'Participant',
+          ticketId: ticketCode,
+          qrImage: qrImageBuffer,
+        });
+
+        pdfMap.set(ticketCode, pdfBuffer);
+
+        const ticketType = order?.ticket?.type ?? 'regular';
+        this.logger.log(`Ticket type: ${ticketType}`);
+
+        const pngBuffer = await this.visualTicketGeneration(
+          ticketType,
+          participant.firstName || 'Participant',
+        );
+
+        pngMap.set(ticketCode || 'Participant', pngBuffer);
+
+        //for validation in dev with x-scanner-key
+        console.log(ticketUrl);
+      }),
+    );
+
+    const pdfBufferInvoice = await this.generateInvoiceForOrder(orderId);
+
+    // SEND ALL PARTICIPANT PDFs
+    await this.mailService.sendParticipantEmails(orderId, pdfMap, pngMap, true);
+
+    // SEND BUYER CONFIRMATION
+    if (order.paymentType === 'RAZORPAY') {
+      await this.mailService.sendBuyerEmail(orderId, pdfBufferInvoice, true);
+    } else {
+      await this.mailService.sendBuyerCryptoEmail(orderId, true);
+    }
+  }
+
 
 
   async generateQRforTicket(ticketCode: string) {

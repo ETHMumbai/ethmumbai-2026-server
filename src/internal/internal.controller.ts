@@ -467,6 +467,18 @@ export class InternalController {
     );
   }
 
+  //resend for wrong emails
+  @Post('resendTicketsForEmail')
+  async resendTicketsForEmail(
+    @Body() body: { orderId:string, updateEmail: string; ticketCode: string }
+  ) {
+    await this.ticketsService.generateTicketForEmail(
+      body.orderId,
+       body.updateEmail,
+       body.ticketCode,
+    );
+  }
+
   // order existing but ticket not generated
   @Post('sendTicketsForExistingOrder')
   async sendTicketsForExistingOrder(
