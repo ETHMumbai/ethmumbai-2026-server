@@ -95,6 +95,7 @@ model GeneratedTicket {
   qrHash        String      @unique
   qrUrl         String?
   checkedInBy   String?
+  merchReceived Boolean     @default(false)
   order         Order       @relation(fields: [orderId], references: [id])
   participant   Participant @relation(fields: [participantId], references: [id])
 }
