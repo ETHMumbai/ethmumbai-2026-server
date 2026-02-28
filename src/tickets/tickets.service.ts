@@ -55,6 +55,14 @@ export class TicketsService {
     }
   }
 
+  async markMerch (token:string){
+    await this.prisma.generatedTicket.update({
+      where: { ticketCode: token, merchReceived: false },
+      data: { merchReceived: true },
+    });
+
+  }
+
   async generateTicketsForOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -626,6 +634,7 @@ export class TicketsService {
     participantEmail: ticket.participant.email,
     qrUrl: ticket.qrUrl,
     checkedIn: ticket.checkedIn,
+    merchReceived: ticket.merchReceived,
   };
 }
 

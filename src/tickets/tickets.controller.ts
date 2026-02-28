@@ -357,5 +357,16 @@ export class TicketsController {
     buyerName: resp?.buyerName,
   };
   }
+
+  @UseGuards(ApiKeyGuard)
+  @Post('merch/:token')
+async verifyMerch(
+  @Param('token') token: string,
+) {
+  console.log('🎯 Merch mark request for token:', token);
+  const resp = await this.ticketService.markMerch(token);
+
+  return {ok:true, message: 'Merch marked as received for ticket code: ' + token};
+}
  
 }
