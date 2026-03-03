@@ -56,6 +56,9 @@ export class TicketsService {
   }
 
   async markMerch (token:string){
+
+    
+    
     await this.prisma.generatedTicket.update({
       where: { ticketCode: token, merchReceived: false },
       data: { merchReceived: true },
@@ -302,12 +305,14 @@ export class TicketsService {
 
     const ticket = await this.prisma.generatedTicket.findFirst({
       where: { qrHash },
+      include: { participant: true,  order: { include: { buyer: true, ticket: true } } },
     });
 
     if (!ticket) throw new NotFoundException('Ticket not found');
 
     if (ticket.checkedIn) {
-      return { ok: false, reason: 'Participant is already checked in' };
+      return { ok: true, reason: 'checkedIn', participantName: ticket.participant.firstName, ticketTypeTitle: ticket.order.ticket.title || 'Ticket',
+        buyerName: ticket.order.buyer.firstName || 'Buyer', merchReceived: ticket.merchReceived };
     }
 
     const result = await this.prisma.generatedTicket.update({

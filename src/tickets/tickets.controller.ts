@@ -345,17 +345,20 @@ export class TicketsController {
     //show the participant details if the token is valid
     //have a seperate call for verifying ticket
     const resp = await this.ticketService.verifyAndMark(token, checkedInBy);
-    if (resp?.ok == false) {
-      return 'Check-in failed: ' + resp?.reason;
-    }
-    return {
-    ok: true,
-    message: `Hi ${resp?.participantName}, Welcome to ETHMumbai!`,
-    participantName: resp?.participantName,
-    ticketType: resp?.ticketTypeTitle,
-    ticketCode: token,
-    buyerName: resp?.buyerName,
-  };
+    const isAlreadyCheckedIn = resp?.ok === true && resp?.reason === "checkedIn";
+
+return {
+  ok: true,
+  reason: isAlreadyCheckedIn ? resp.reason : undefined,
+  message: isAlreadyCheckedIn
+    ? `Hi ${resp?.participantName}, you are checked in!`
+    : `Hi ${resp?.participantName}, Welcome to ETHMumbai!`,
+  participantName: resp?.participantName,
+  ticketType: resp?.ticketTypeTitle,
+  ticketCode: token,
+  buyerName: resp?.buyerName,
+  merchReceived: resp?.merchReceived
+};
   }
 
   @UseGuards(ApiKeyGuard)
