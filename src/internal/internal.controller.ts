@@ -17,9 +17,10 @@ import { MailService } from '../mail/mail.service';
 import { ApiKeyGuard } from 'src/utils/api-key-auth';
 import { TicketsService } from 'src/tickets/tickets.service';
 import Razorpay from 'razorpay';
+import JSZip from 'jszip';
 import path from 'path';
 import { createCanvas, loadImage, registerFont } from 'canvas';
-import { Response } from 'express';
+import type { Response } from 'express';
 
 @Controller('internal')
 // @UseGuards(AdminGuard)
@@ -370,14 +371,14 @@ export class InternalController {
   ) {
     // const { firstName, lastName, email } = body;
     const ticket = await this.prisma.ticket.findFirst({
-      where: { type: 'standard' },
+      where: { type: 'friends' },
     });
     if (!ticket) {
       throw new BadRequestException('Ticket not found');
     }
     for (const { firstName, lastName, email } of body) {
       const existingParticipant = await this.prisma.participant.findUnique({
-        where: { email: email },
+        where: { email: email, order: { status: 'paid' } },
         include: { order: true, generatedTicket: true },
       });
 
@@ -450,7 +451,10 @@ export class InternalController {
           );
         }
       }
+
     }
+
+    return { success: true, message: `Tickets processed for ${body.length || 0} participants` };
   }
 
   @Post('sendTicketsForExistingOrder')
@@ -600,4 +604,18 @@ export class InternalController {
 
     // canvas.createPNGStream().pipe(res);
   }
+
+  @Get("download/razorpay-invoices")
+  @UseGuards(ApiKeyGuard)
+  async download(@Res() res: Response) {
+    const zip = await this.ticketsService.downloadSentRazorpayInvoices();
+
+    res.set({
+      "Content-Type": "application/zip",
+      "Content-Disposition": "attachment; filename=sent_razorpay_invoices.zip",
+    });
+
+    res.send(zip);
+  }
+
 }

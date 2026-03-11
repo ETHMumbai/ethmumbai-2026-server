@@ -157,6 +157,7 @@ export class MailService {
   async sendParticipantEmails(
     orderId: string,
     pdfMap: Map<string, Buffer>, // ticketCode → PDF buffer
+    pngMap: Map<string, Buffer> // ticketCode → PNG buffer
   ) {
     const participants = await this.prisma.participant.findMany({
       where: { orderId, emailSent: false },
@@ -168,9 +169,9 @@ export class MailService {
       return;
     }
 
-    const templateId = process.env.LOOPS_PARTICIPANT_EMAIL_ID;
+    const templateId = process.env.LOOPS_PARTICIPANT_EMAIL_PNG_ID;
     if (!templateId) {
-      this.logger.error('Missing env: LOOPS_PARTICIPANT_EMAIL_ID');
+      this.logger.error('Missing env: LOOPS_PARTICIPANT_EMAIL_PNG_ID');
       return;
     }
 
@@ -186,6 +187,22 @@ export class MailService {
         continue;
       }
 
+      const pngBuffer = pngMap.get(ticketCode);
+      if (!pngBuffer) {
+        this.logger.error(`Missing PNG buffer for ticket ${ticketCode}`);
+        continue;
+      }
+
+      const pngAttachment = {
+        filename: `ETHMumbai-Ticket-${p.firstName}.png`,
+        contentType: 'image/png',
+        data: pngBuffer.toString('base64'),
+      };
+      const tweetText = encodeURIComponent(
+        `I'm attending @ethmumbai 2026 🥳
+\n\nBEST Ethereum Conference in Mumbai on 12th March 2026 with 50 speakers & 500 participants. See you there!`,
+      );
+
       const attachment = {
         filename: `ETHMumbai-Ticket-${ticketCode}.pdf`,
         contentType: 'application/pdf',
@@ -199,8 +216,9 @@ export class MailService {
           name: p.firstName,
           orderId,
           ticketCode,
+          tweetText: tweetText,
         },
-        [attachment],
+        [attachment, pngAttachment],
       );
 
       if (!resp?.success) {
@@ -219,17 +237,18 @@ export class MailService {
   }
 
   async sendParticipantEmailsWithPng(
+    firstName: string,
     email: string,
     pngBuffer: Buffer) {
-    const participant = await this.prisma.participant.findFirst({
-      where: { email },
-      include: { order: true },
-    });
+    // const participant = await this.prisma.participant.findFirst({
+    //   where: { email },
+    //   include: { order: true },
+    // });
 
-    if (!participant) {
-      this.logger.warn(`No participant found with email: ${email}`);
-      return;
-    }
+    // if (!participant) {
+    //   this.logger.warn(`No participant found with email: ${email}`);
+    //   return;
+    // }
 
     const templateId = process.env.LOOPS_SHARE_ON_X_EMAIL_ID;
     if (!templateId) {
@@ -237,7 +256,7 @@ export class MailService {
       return;
     }
 
-    if (!participant.firstName) {
+    if (!firstName) {
       throw new BadRequestException('Missing firstName (f) parameter');
     }
 
@@ -247,43 +266,44 @@ export class MailService {
     // )) as Buffer | undefined;
 
     if (!pngBuffer) {
-      this.logger.error(`Missing PNG buffer for participant ${participant.email}`);
+      this.logger.error(`Missing PNG buffer for participant ${email}`);
       return;
     }
 
     const pngAttachment = {
-      filename: `ETHMumbai-Ticket-${participant.firstName}.png`,
+      filename: `ETHMumbai-Ticket-${firstName}.png`,
       contentType: 'image/png',
       data: pngBuffer.toString('base64'),
     };
-     const tweetText = encodeURIComponent(
-                `Just got my ticket for ETHMumbai 🚀\nSee you in Mumbai!\n\n@ethmumbai`,
-              );
+    const tweetText = encodeURIComponent(
+      `I'm attending @ethmumbai 2026 🥳
+\n\nBEST Ethereum Conference in Mumbai on 12th March 2026 with 50 speakers & 500 participants. See you there!`,
+    );
 
     const resp = await this.loops.sendTransactionalEmail(
       templateId,
-      participant.email,
+      email,
       {
-        name: participant.firstName,
-        tweetText: tweetText,
+        name: firstName,
+        tweetText,
       },
       [pngAttachment],
     );
 
     if (!resp?.success) {
-      this.logger.error(`Failed sending ticket → ${participant.email}`);
+      this.logger.error(`Failed sending ticket → ${email}`);
       return;
     }
 
-    this.logger.log(`Ticket PDF sent → ${participant.email}`);
+    this.logger.log(`Ticket PDF sent → ${email}`);
     // }
   }
 
   async sendHackerEmailsWithPng(
-    firstName:string,
+    firstName: string,
     email: string,
     pngBuffer: Buffer) {
-    
+
 
     const templateId = process.env.LOOPS_SHARE_ON_X_HACKER_EMAIL_ID;
     if (!templateId) {
@@ -297,9 +317,9 @@ export class MailService {
       contentType: 'image/png',
       data: pngBuffer.toString('base64'),
     };
-     const tweetText = encodeURIComponent(
-                `I'm hacking at @ethmumbai❤️‍🔥\n\nCan't wait to build at the BEST Ethereum hackathon from 13th – 15th March 2026 on DeFi, Privacy & AI tracks.`,
-              );
+    const tweetText = encodeURIComponent(
+      `I'm hacking at @ethmumbai❤️‍🔥\n\nCan't wait to build at the BEST Ethereum hackathon from 13th – 15th March 2026 on DeFi, Privacy & AI tracks.`,
+    );
 
     const resp = await this.loops.sendTransactionalEmail(
       templateId,
