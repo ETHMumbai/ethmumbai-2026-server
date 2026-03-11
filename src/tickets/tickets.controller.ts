@@ -155,23 +155,66 @@ export class TicketsController {
     pdfDoc.pipe(res);
   }
 
+   @Get('/details/:input')
+  async getTicketDetails(@Param('input') input: string){
+    console.log('🎯 Controller hit with input:', input);
+    return await this.ticketService.getTicketDetails(input);
+  }
+
   //check-in is happening when this endpoint is hit -> change this to include a button/check that can be used by the team to check-in
   @UseGuards(ApiKeyGuard)
   @Get('/:token')
-  async verify(@Param('token') token: string) {
-    const resp = await this.ticketService.verifyAndMark(token);
-    if (resp?.ok == false) {
-      return 'Check-in failed: ' + resp?.reason;
-    }
-    return (
-      'Hi ' +
-      resp?.participantName +
-      ', Welcome to ETHMumbai! You have received the ' +
-      resp?.ticketTypeTitle +
-      ' ETHMumbai Conference ticket with ticket code : ' +
-      token +
-      ' paid for by ' +
-      resp?.buyerName
-    );
+  async verify(@Param('token') token: string,  @Query('checkedInBy') checkedInBy: string,) {
+    //show the participant details if the token is valid
+    //have a seperate call for verifying ticket
+    const resp = await this.ticketService.verifyAndMark(token, checkedInBy);
+    const isAlreadyCheckedIn = resp?.ok === true && resp?.reason === "checkedIn";
+
+return {
+  ok: true,
+  reason: isAlreadyCheckedIn ? resp.reason : undefined,
+  message: isAlreadyCheckedIn
+    ? `Hi ${resp?.participantName}, you are checked in!`
+    : `Hi ${resp?.participantName}, Welcome to ETHMumbai!`,
+  participantName: resp?.participantName,
+  ticketType: resp?.ticketTypeTitle,
+  ticketCode: token,
+  buyerName: resp?.buyerName,
+  merchReceived: resp?.merchReceived
+};
   }
+
+  @UseGuards(ApiKeyGuard)
+  @Post('merch/:token')
+async verifyMerch(
+  @Param('token') token: string,
+) {
+  console.log('🎯 Merch mark request for token:', token);
+  const resp = await this.ticketService.markMerch(token);
+
+  return {ok:true, message: 'Merch marked as received for ticket code: ' + token};
+}
+
+ @UseGuards(ApiKeyGuard)
+  @Get('party/:token')
+  async partyQRCheckIn(@Param('token') token: string) {
+    //show the participant details if the token is valid
+    //have a seperate call for verifying ticket
+     console.log('🎯 Party check-in request for token:', token);
+    const resp = await this.ticketService.markParty(token);
+
+const isAlreadyCheckedIn = resp?.ok === true && resp?.reason === "checkedIn";
+
+return {
+  ok: true,
+  reason: isAlreadyCheckedIn ? resp.reason : undefined,
+  message: isAlreadyCheckedIn
+    ? `Hi ${resp?.participantName}, you are already checked in for the party!`
+    : `Hi ${resp?.participantName}, Welcome to ETHMumbai AfterParty!`,
+  participantName: resp?.participantName,
+  ticketCode: token,
+  partyCheckedIn: resp.afterPartyCheckIn,
+};
+  }
+ 
 }
