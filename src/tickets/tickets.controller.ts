@@ -161,12 +161,6 @@ export class TicketsController {
     return await this.ticketService.getTicketDetails(input);
   }
 
-   @Get('/details/:input')
-  async getTicketDetails(@Param('input') input: string){
-    console.log('🎯 Controller hit with input:', input);
-    return await this.ticketService.getTicketDetails(input);
-  }
-
   //check-in is happening when this endpoint is hit -> change this to include a button/check that can be used by the team to check-in
   @UseGuards(ApiKeyGuard)
   @Get('/:token')
