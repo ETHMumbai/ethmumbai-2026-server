@@ -56,6 +56,17 @@ export class TicketsService {
     }
   }
 
+  async markMerch (token:string){
+
+    
+    
+    await this.prisma.generatedTicket.update({
+      where: { ticketCode: token, merchReceived: false },
+      data: { merchReceived: true },
+    });
+
+  }
+
   async generateTicketsForOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -299,24 +310,26 @@ export class TicketsService {
     };
   }
 
-  async verifyAndMark(token: string) {
+  async verifyAndMark(token: string, checkedInBy: string) {
     if (!token) throw new BadRequestException('token required');
 
     const qrHash = crypto.createHash('sha256').update(token).digest('hex');
 
     const ticket = await this.prisma.generatedTicket.findFirst({
       where: { qrHash },
+      include: { participant: true,  order: { include: { buyer: true, ticket: true } } },
     });
 
     if (!ticket) throw new NotFoundException('Ticket not found');
 
     if (ticket.checkedIn) {
-      return { ok: false, reason: 'Participant is already checked in' };
+      return { ok: true, reason: 'checkedIn', participantName: ticket.participant.firstName, ticketTypeTitle: ticket.order.ticket.title || 'Ticket',
+        buyerName: ticket.order.buyer.firstName || 'Buyer', merchReceived: ticket.merchReceived };
     }
 
     const result = await this.prisma.generatedTicket.update({
       where: { qrHash, checkedIn: false },
-      data: { checkedIn: true },
+      data: { checkedIn: true, checkedInAt: new Date(), checkedInBy: checkedInBy },
     });
 
     if (result) {
@@ -683,6 +696,64 @@ export class TicketsService {
 
     await this.mailService.sendHackerEmailsWithPng(firstName, email, pngBuffer);
   }
+
+
+  async getTicketDetails(input: string) {
+  const ticket = await this.prisma.generatedTicket.findFirst({
+    where: {
+      OR: [
+        { participant: { email: input } },
+        { ticketCode: input },
+      ],
+    },
+    include: {
+      participant: true,
+    },
+  });
+
+  if (!ticket) {
+    throw new NotFoundException('Ticket not found');
+  }
+
+  return {
+    ticketCode: ticket.ticketCode,
+    participant : ticket.participant.firstName,
+    participantEmail: ticket.participant.email,
+    qrUrl: ticket.qrUrl,
+    checkedIn: ticket.checkedIn,
+    merchReceived: ticket.merchReceived,
+  };
+}
+async markParty(token:string){
+  const ticket =  await this.prisma.generatedTicket.findFirst({
+      where: { ticketCode: token },
+      select: { afterPartyCheckIn: true, participant: { select: { firstName: true } } }
+    });
+
+  if (ticket?.afterPartyCheckIn) {
+      return { ok: true, reason: 'checkedIn', participantName: ticket.participant.firstName };
+    }
+
+   const result = await this.prisma.generatedTicket.update({
+  where: { ticketCode: token },
+  data: { afterPartyCheckIn: true },
+  include: {
+    participant: {
+      select: {
+        firstName: true,
+      },
+    },
+  },
+});
+  
+
+    return {
+      participantName: result.participant.firstName,
+      afterPartyCheckIn: result.afterPartyCheckIn,
+      
+    }
+
+}
 
   async downloadSentRazorpayInvoices(): Promise<Buffer> {
     const orders = await this.prisma.order.findMany({
