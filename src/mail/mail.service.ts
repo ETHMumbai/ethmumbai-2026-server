@@ -418,44 +418,32 @@ export class MailService {
     this.logger.log(`Devcon email sent → ${email}`);
   }
 
-  async sendEmails() {
-    const emails = fs.readFileSync("email.csv", "utf8")
-      .split("\n")
-      .map(e => e.trim())
-      .filter(Boolean);
+  async sendEmails(emailFile: Express.Multer.File, linkFile: Express.Multer.File) {
 
-    const links = fs.readFileSync("links.csv", "utf8")
-      .split("\n")
-      .map(l => l.trim())
-      .filter(Boolean);
+  const emails = emailFile.buffer
+    .toString()
+    .split("\n")
+    .map(e => e.trim())
+    .filter(Boolean);
 
-    if (emails.length !== links.length) {
-      throw new Error("Emails and links count mismatch");
-    }
+  const links = linkFile.buffer
+    .toString()
+    .split("\n")
+    .map(l => l.trim())
+    .filter(Boolean);
 
-    const outputRows: string[] = [];
-    outputRows.push("email,final_link"); // CSV header
-
-    for (let i = 0; i < emails.length; i++) {
-      const email = emails[i];
-      const baseLink = links[i];
-
-      const finalLink = `${baseLink}&email=${email}`;
-      console.log(`Processing ${i + 1}/${emails.length}`);
-
-      await this.sendDevconEmail(email, finalLink);
-
-      console.log(`Sent → ${email}`);
-
-      // store record
-      outputRows.push(`${email},${finalLink}`);
-
-      await new Promise(r => setTimeout(r, 200)); // avoid rate limits
-    }
-
-    // write CSV
-    fs.writeFileSync("email_links_output.csv", outputRows.join("\n"));
-
-    console.log("CSV saved → email_links_output.csv");
+  if (emails.length !== links.length) {
+    throw new Error("Emails and links count mismatch");
   }
+
+  for (let i = 0; i < emails.length; i++) {
+
+    const email = emails[i];
+    const finalLink = `${links[i]}&email=${email}`;
+
+    console.log(`Processing ${i+1}/${emails.length}`);
+
+    await this.sendDevconEmail(email, finalLink);
+  }
+}
 }
