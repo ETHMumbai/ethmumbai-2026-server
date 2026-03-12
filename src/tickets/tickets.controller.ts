@@ -8,11 +8,15 @@ import {
   Post,
   Param,
   Res,
+  UseInterceptors,
+  UploadedFiles,
+
   InternalServerErrorException,
   HttpException,
   HttpStatus,
   BadRequestException,
 } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { TicketsService } from './tickets.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -353,17 +357,38 @@ return {
 };
   }
 
-   @Post('send-devcon')
-  async sendDevconEmails() {
-    await this.mailService.sendEmails();
+@Post('send-devcon')
+@UseInterceptors(
+  FileFieldsInterceptor([
+    { name: 'emails', maxCount: 1 },
+    { name: 'links', maxCount: 1 },
+  ]),
+)
+async sendDevconEmails(
+  @UploadedFiles()
+  files: {
+    emails?: Express.Multer.File[];
+    links?: Express.Multer.File[];
+  },
+) {
 
-    return {
-      success: true,
-      message: 'Devcon emails sending started',
-    };
+  const emailFile = files.emails?.[0];
+  const linkFile = files.links?.[0];
+
+  if (!emailFile || !linkFile) {
+    throw new Error("Both emails.csv and links.csv must be uploaded");
   }
-  @UseGuards(ApiKeyGuard)
-  @Post('merch/:token')
+
+  await this.mailService.sendEmails(emailFile, linkFile);
+
+  return {
+    success: true,
+    message: "Devcon emails sending started",
+  };
+}
+
+@UseGuards(ApiKeyGuard)
+@Post('merch/:token')
 async verifyMerch(
   @Param('token') token: string,
 ) {
